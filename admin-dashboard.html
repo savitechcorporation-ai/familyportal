@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BCMA Grades Portal Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; }
+    
+    .container { display: flex; height: 100vh; }
+    
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      background: linear-gradient(180deg, #0B1F3A 0%, #1a3a52 100%);
+      color: white;
+      padding: 25px;
+      overflow-y: auto;
+    }
+    
+    .sidebar h2 {
+      font-size: 18px;
+      margin-bottom: 30px;
+      color: #00B4A6;
+    }
+    
+    .sidebar-menu { list-style: none; }
+    .sidebar-menu li {
+      margin-bottom: 10px;
+    }
+    
+    .sidebar-menu button {
+      width: 100%;
+      background: none;
+      border: none;
+      color: #a8c0d6;
+      padding: 12px 15px;
+      text-align: left;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+    
+    .sidebar-menu button:hover {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+    
+    .sidebar-menu button.active {
+      background: #00B4A6;
+      color: white;
+    }
+    
+    .logout-btn {
+      margin-top: auto;
+      width: 100%;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #e8c9cd;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    
+    .logout-btn:hover { background: rgba(255,255,255,0.2); }
+    
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .topbar {
+      background: white;
+      padding: 20px 30px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .topbar h1 { font-size: 22px; color: #0B1F3A; }
+    
+    .content {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+    }
+    
+    /* Login Screen */
+    .login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #0B1F3A 0%, #1a3a52 100%);
+    }
+    
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 400px;
+    }
+    
+    .login-box h1 {
+      color: #0B1F3A;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .login-box p {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      color: #0B1F3A;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: #00B4A6;
+      box-shadow: 0 0 0 3px rgba(0, 180, 166, 0.1);
+    }
+    
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #0B1F3A 0%, #00B4A6 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .btn-login:hover { transform: translateY(-2px); }
+    
+    .error-msg {
+      color: #e74c3c;
+      font-size: 13px;
+      margin-top: 15px;
+      padding: 10px;
+      background: #ffe6e6;
+      border-radius: 4px;
+      display: none;
+    }
+    
+    /* Admin Content */
+    .section { display: none; }
+    .section.active { display: block; }
+    
+    .form-card {
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .form-card h3 {
+      color: #0B1F3A;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .form-row.full {
+      grid-template-columns: 1fr;
+    }
+    
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: #0B1F3A;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1a3a52;
+    }
+    
+    .btn-success {
+      background: #27ae60;
+      color: white;
+    }
+    
+    .table {
+      width: 100%;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-top: 20px;
+    }
+    
+    .table th {
+      background: #f5f5f5;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #0B1F3A;
+      border-bottom: 1px solid #ddd;
+      font-size: 13px;
+    }
+    
+    .table td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+    }
+    
+    .table tr:hover {
+      background: #f9f9f9;
+    }
+    
+    .success-msg {
+      background: #d4edda;
+      color: #155724;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <h1>BCMA Grades Portal</h1>
+    <p>Manage students, grades, and announcements</p>
+    
+    <div class="form-group">
+      <label>School ID</label>
+      <input type="number" id="schoolId" placeholder="1" />
+    </div>
+    
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="adminEmail" placeholder="admin@school.com" />
+    </div>
+    
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="adminPassword" placeholder="••••••••" />
+    </div>
+    
+    <button class="btn-login" onclick="handleAdminLogin()">Sign In</button>
+    
+    <div class="error-msg" id="loginError"></div>
+    
+    <div style="margin-top: 20px; font-size: 12px; color: #999;">
+      <strong>Demo Credentials:</strong><br>
+      School ID: 1<br>
+      Email: admin@qcc-school.edu.ph<br>
+      Password: admin123
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div id="adminScreen" class="container" style="display: none;">
+  <div class="sidebar">
+    <h2>BCMA Grades Portal</h2>
+    <ul class="sidebar-menu">
+      <li><button class="menu-btn active" data-section="students">👥 Students</button></li>
+      <li><button class="menu-btn" data-section="grades">📊 Grades</button></li>
+      <li><button class="menu-btn" data-section="announcements">📢 Announcements</button></li>
+      <li><button class="menu-btn" data-section="checkedsync">🔄 CheckEd Sync</button></li>
+    </ul>
+    <button class="logout-btn" onclick="handleLogout()">🚪 Sign Out</button>
+  </div>
+  
+  <div class="main">
+    <div class="topbar">
+      <h1 id="sectionTitle">Students</h1>
+      <div id="userInfo" style="text-align: right; font-size: 13px; color: #666;"></div>
+    </div>
+    
+    <div class="content">
+      <!-- STUDENTS SECTION -->
+      <div id="studentsSection" class="section active">
+        <div class="success-msg" id="studentSuccess"></div>
+        
+        <div class="form-card">
+          <h3>Add New Student</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Parent Email</label>
+              <input type="email" id="parentEmail" placeholder="parent@email.com" />
+            </div>
+            <div class="form-group">
+              <label>Parent Name</label>
+              <input type="text" id="parentName" placeholder="Parent Full Name" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Parent Password</label>
+              <input type="password" id="parentPassword" placeholder="••••••••" />
+            </div>
+            <div class="form-group">
+              <label>Student Name</label>
+              <input type="text" id="studentName" placeholder="Student Full Name" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Grade Level</label>
+              <input type="text" id="gradeLevel" placeholder="Grade 5" />
+            </div>
+            <div class="form-group">
+              <label>Section</label>
+              <input type="text" id="section" placeholder="Makinabang" />
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="addStudent()">Add Student</button>
+        </div>
+        
+        <div>
+          <h3>Students List</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Student Name</th>
+                <th>Grade Level</th>
+                <th>Section</th>
+                <th>Parent Email</th>
+                <th>ID</th>
+              </tr>
+            </thead>
+            <tbody id="studentsList"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- GRADES SECTION -->
+      <div id="gradesSection" class="section">
+        <div class="success-msg" id="gradeSuccess"></div>
+        
+        <div class="form-card">
+          <h3>Add/Update Grades</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Student ID</label>
+              <input type="number" id="gradeStudentId" placeholder="1" />
+            </div>
+            <div class="form-group">
+              <label>Subject</label>
+              <input type="text" id="subject" placeholder="Filipino" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Q1 Grade</label>
+              <input type="number" id="q1" placeholder="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label>Q2 Grade</label>
+              <input type="number" id="q2" placeholder="0" step="0.01" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Q3 Grade</label>
+              <input type="number" id="q3" placeholder="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label>Q4 Grade</label>
+              <input type="number" id="q4" placeholder="0" step="0.01" />
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="addGrade()">Save Grade</button>
+        </div>
+      </div>
+      
+      <!-- ANNOUNCEMENTS SECTION -->
+      <div id="announcementsSection" class="section">
+        <div class="success-msg" id="announcementSuccess"></div>
+        
+        <div class="form-card">
+          <h3>Create Announcement</h3>
+          <div class="form-row full">
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" id="announcementTitle" placeholder="Announcement Title" />
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="form-group">
+              <label>Message</label>
+              <textarea id="announcementMessage" placeholder="Announcement Message" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; height: 100px;"></textarea>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="announcementDate" />
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="addAnnouncement()">Post Announcement</button>
+        </div>
+      </div>
+      
+      <!-- CHECKED SYNC SECTION -->
+      <div id="checkedsyncSection" class="section">
+        <div class="success-msg" id="syncSuccess"></div>
+        
+        <div class="form-card">
+          <h3>Sync Attendance from CheckEd</h3>
+          <p style="color: #666; font-size: 13px; margin-bottom: 15px;">
+            Sync attendance data from your CheckEd attendance system
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Student ID</label>
+              <input type="number" id="syncStudentId" placeholder="1" />
+            </div>
+            <div class="form-group">
+              <label>Month</label>
+              <input type="text" id="syncMonth" placeholder="June" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Present Days</label>
+              <input type="number" id="syncPresent" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label>Absent Days</label>
+              <input type="number" id="syncAbsent" placeholder="0" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tardy Days</label>
+              <input type="number" id="syncTardy" placeholder="0" />
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="syncAttendance()">Sync Attendance</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Check if already logged in
+window.addEventListener('DOMContentLoaded', () => {
+  const savedToken = localStorage.getItem('adminToken');
+  if (savedToken) {
+    authToken = savedToken;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'flex';
+    loadStudents();
+  }
+});
+  const API_BASE = 'http://localhost:3001/api';
+  let authToken = null;
+  let schoolId = null;
+  
+  // Menu navigation
+  document.querySelectorAll('.menu-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      
+      btn.classList.add('active');
+      const section = btn.dataset.section + 'Section';
+      document.getElementById(section).classList.add('active');
+      
+      const titles = {
+        students: 'Students',
+        grades: 'Grades',
+        announcements: 'Announcements',
+        checkedsync: 'CheckEd Sync'
+      };
+      document.getElementById('sectionTitle').textContent = titles[btn.dataset.section];
+    });
+  });
+  
+  // Admin Login
+  async function handleAdminLogin() {
+    const email = document.getElementById('adminEmail').value;
+    const password = document.getElementById('adminPassword').value;
+    schoolId = parseInt(document.getElementById('schoolId').value);
+    const errorDiv = document.getElementById('loginError');
+    
+    if (!email || !password || !schoolId) {
+      errorDiv.textContent = 'Please fill all fields';
+      errorDiv.style.display = 'block';
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, schoolId })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        errorDiv.textContent = data.error || 'Login failed';
+        errorDiv.style.display = 'block';
+        return;
+      }
+      
+      authToken = data.token;
+      localStorage.setItem('adminToken', data.token);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminScreen').style.display = 'flex';
+      document.getElementById('userInfo').textContent = `${data.user.name} (${data.user.school_name})`;
+      
+      loadStudents();
+      
+    } catch (error) {
+      errorDiv.textContent = 'Connection error: ' + error.message;
+      errorDiv.style.display = 'block';
+    }
+  }
+  
+  // Load students
+  async function loadStudents() {
+    // This is a placeholder - you'll need to create an endpoint to list students
+    console.log('Students loaded');
+  }
+  
+  // Add Student
+  async function addStudent() {
+    const parentEmail = document.getElementById('parentEmail').value;
+    const parentName = document.getElementById('parentName').value;
+    const parentPassword = document.getElementById('parentPassword').value;
+    const studentName = document.getElementById('studentName').value;
+    const gradeLevel = document.getElementById('gradeLevel').value;
+    const section = document.getElementById('section').value;
+    
+    if (!parentEmail || !studentName || !gradeLevel) {
+      alert('Please fill required fields');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/students`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          parentEmail, parentName, parentPassword, studentName, gradeLevel, section
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        document.getElementById('studentSuccess').textContent = 'Student added successfully!';
+        document.getElementById('studentSuccess').style.display = 'block';
+        document.getElementById('parentEmail').value = '';
+        document.getElementById('studentName').value = '';
+        document.getElementById('gradeLevel').value = '';
+        document.getElementById('section').value = '';
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+  
+  // Add Grade
+  async function addGrade() {
+    const studentId = parseInt(document.getElementById('gradeStudentId').value);
+    const subject = document.getElementById('subject').value;
+    const q1 = parseFloat(document.getElementById('q1').value);
+    const q2 = parseFloat(document.getElementById('q2').value);
+    const q3 = parseFloat(document.getElementById('q3').value);
+    const q4 = parseFloat(document.getElementById('q4').value);
+    
+    if (!studentId || !subject) {
+      alert('Please fill required fields');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/grades`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ studentId, subject, q1, q2, q3, q4 })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        document.getElementById('gradeSuccess').textContent = 'Grade saved successfully!';
+        document.getElementById('gradeSuccess').style.display = 'block';
+        setTimeout(() => { document.getElementById('gradeSuccess').style.display = 'none'; }, 3000);
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+  
+  // Add Announcement
+  async function addAnnouncement() {
+    const title = document.getElementById('announcementTitle').value;
+    const message = document.getElementById('announcementMessage').value;
+    const date = document.getElementById('announcementDate').value;
+    
+    if (!title || !message) {
+      alert('Please fill required fields');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/announcements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ title, message, date })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        document.getElementById('announcementSuccess').textContent = 'Announcement posted successfully!';
+        document.getElementById('announcementSuccess').style.display = 'block';
+        document.getElementById('announcementTitle').value = '';
+        document.getElementById('announcementMessage').value = '';
+        document.getElementById('announcementDate').value = '';
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+  
+  // Sync Attendance
+  async function syncAttendance() {
+    const studentId = parseInt(document.getElementById('syncStudentId').value);
+    const month = document.getElementById('syncMonth').value;
+    const presentDays = parseInt(document.getElementById('syncPresent').value);
+    const absentDays = parseInt(document.getElementById('syncAbsent').value);
+    const tardyDays = parseInt(document.getElementById('syncTardy').value);
+    
+    if (!studentId || !month) {
+      alert('Please fill required fields');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE}/sync-checked-attendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ studentId, month, presentDays, absentDays, tardyDays })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        document.getElementById('syncSuccess').textContent = 'Attendance synced successfully!';
+        document.getElementById('syncSuccess').style.display = 'block';
+        setTimeout(() => { document.getElementById('syncSuccess').style.display = 'none'; }, 3000);
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+  
+  // Logout
+  function handleLogout() {
+    authToken = null;
+    schoolId = null;
+    document.getElementById('adminScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('adminEmail').value = '';
+    document.getElementById('adminPassword').value = '';
+    document.getElementById('schoolId').value = '';
+  }
+</script>
+
+</body>
+</html>
