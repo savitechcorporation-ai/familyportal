@@ -162,8 +162,8 @@ app.post('/api/login', async (req, res) => {
     }
     
     const user = userResult.rows[0];
-    const validPassword = (password === user.password);
-    
+    const validPassword = await verifyPassword(password, user.password);
+
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
