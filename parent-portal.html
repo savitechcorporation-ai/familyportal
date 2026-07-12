@@ -356,6 +356,11 @@
     </div>
 
     <div class="form-group">
+      <label>Student ID Number</label>
+      <input type="text" id="studentNumber" placeholder="e.g. 2026-00123" />
+    </div>
+
+    <div class="form-group">
       <label>Password</label>
       <input type="password" id="parentPassword" placeholder="••••••••" />
     </div>
@@ -510,11 +515,12 @@
   // Parent Login
   async function handleParentLogin() {
     const email = document.getElementById('parentEmail').value;
+    const studentNumber = document.getElementById('studentNumber').value;
     const password = document.getElementById('parentPassword').value;
     const schoolId = parseInt(document.getElementById('schoolId').value);
     const errorDiv = document.getElementById('loginError');
 
-    if (!email || !password || !schoolId) {
+    if (!email || !studentNumber || !password || !schoolId) {
       errorDiv.textContent = 'Please fill all fields';
       errorDiv.style.display = 'block';
       return;
@@ -524,7 +530,7 @@
       const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, schoolId })
+        body: JSON.stringify({ email, password, schoolId, studentNumber })
       });
 
       const data = await response.json();
@@ -782,6 +788,7 @@
     document.getElementById('portalScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('parentEmail').value = '';
+    document.getElementById('studentNumber').value = '';
     document.getElementById('parentPassword').value = '';
     document.getElementById('schoolId').value = '';
   }

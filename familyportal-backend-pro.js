@@ -144,44 +144,41 @@ app.post('/api/register-school', async (req, res) => {
 
 // 2. PARENT/ADMIN LOGIN
 app.post('/api/login', async (req, res) => {
-  const { email, password, schoolId } = req.body;
-  
+  const { email, password, schoolId, studentNumber } = req.body;
+
   try {
-    // Find user by email and school
+    // Each child has its own login row, so email alone no longer uniquely
+    // identifies an account. Admins are matched by email+school as before;
+    // parents must also match the Student ID Number of the child that row
+    // is scoped to.
     const userResult = await client.query(
-      `SELECT u.id, u.school_id, u.email, u.password, u.role, u.name,
-              s.name as school_name
+      `SELECT u.id, u.school_id, u.email, u.password, u.role, u.name, s.name AS school_name,
+              st.id AS student_id, st.name AS student_name, st.grade_level, st.section, st.photo
        FROM users u
        JOIN schools s ON u.school_id = s.id
-       WHERE u.email = $1 AND u.school_id = $2`,
-      [email, schoolId]
+       LEFT JOIN students st ON st.parent_id = u.id
+       WHERE u.email = $1 AND u.school_id = $2
+         AND (u.role = 'admin' OR st.student_number = $3)`,
+      [email, schoolId, studentNumber || null]
     );
-    
+
     if (userResult.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
+
     const user = userResult.rows[0];
     const validPassword = await verifyPassword(password, user.password);
 
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
+
     const token = generateToken(user);
-    
-    // Get students for parents
-    let students = [];
-    if (user.role === 'parent') {
-      const studentResult = await client.query(
-        `SELECT id, name, grade_level, section, photo
-         FROM students
-         WHERE parent_id = $1`,
-        [user.id]
-      );
-      students = studentResult.rows;
-    }
-    
+
+    const students = (user.role === 'parent' && user.student_id)
+      ? [{ id: user.student_id, name: user.student_name, grade_level: user.grade_level, section: user.section, photo: user.photo }]
+      : [];
+
     res.json({
       success: true,
       user: {
@@ -195,7 +192,7 @@ app.post('/api/login', async (req, res) => {
       students,
       token
     });
-    
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -330,33 +327,28 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
   
   const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword, studentNumber } = req.body;
 
-  try {
-    // Find or create parent user
-    let parentResult = await client.query(
-      'SELECT id FROM users WHERE email = $1 AND school_id = $2',
-      [parentEmail, req.user.schoolId]
-    );
+  if (!studentNumber) {
+    return res.status(400).json({ error: 'Student ID Number is required' });
+  }
 
-    let parentId;
-    if (parentResult.rows.length === 0) {
-      const hashedPassword = await hashPassword(parentPassword);
-      const createParent = await client.query(
-        `INSERT INTO users (school_id, name, email, password, role)
-         VALUES ($1, $2, $3, $4, 'parent')
-         RETURNING id`,
-        [req.user.schoolId, parentName, parentEmail, hashedPassword]
-      );
-      parentId = createParent.rows[0].id;
-    } else {
-      parentId = parentResult.rows[0].id;
-    }
+  try {
+    // Each child gets its own login row - never reuse an existing parent
+    // account, even if the email matches one already on file.
+    const hashedPassword = await hashPassword(parentPassword);
+    const createParent = await client.query(
+      `INSERT INTO users (school_id, name, email, password, role)
+       VALUES ($1, $2, $3, $4, 'parent')
+       RETURNING id`,
+      [req.user.schoolId, parentName, parentEmail, hashedPassword]
+    );
+    const parentId = createParent.rows[0].id;
 
     // Create student
     const studentResult = await client.query(
       `INSERT INTO students (school_id, parent_id, name, grade_level, section, student_number)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, name, grade_level, section, student_number`,
-      [req.user.schoolId, parentId, studentName, gradeLevel, section, studentNumber || null]
+      [req.user.schoolId, parentId, studentName, gradeLevel, section, studentNumber]
     );
 
     res.json({
