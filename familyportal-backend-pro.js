@@ -307,7 +307,7 @@ app.get('/api/admin/students', verifyToken, async (req, res) => {
 
   try {
     const students = await client.query(
-      `SELECT s.id, s.name, s.grade_level, s.section, u.email AS parent_email
+      `SELECT s.id, s.name, s.grade_level, s.section, s.student_number, u.email AS parent_email
        FROM students s
        JOIN users u ON s.parent_id = u.id
        WHERE s.school_id = $1
@@ -328,15 +328,15 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
   
-  const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword } = req.body;
-  
+  const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword, studentNumber } = req.body;
+
   try {
     // Find or create parent user
     let parentResult = await client.query(
       'SELECT id FROM users WHERE email = $1 AND school_id = $2',
       [parentEmail, req.user.schoolId]
     );
-    
+
     let parentId;
     if (parentResult.rows.length === 0) {
       const hashedPassword = await hashPassword(parentPassword);
@@ -350,21 +350,62 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
     } else {
       parentId = parentResult.rows[0].id;
     }
-    
+
     // Create student
     const studentResult = await client.query(
-      `INSERT INTO students (school_id, parent_id, name, grade_level, section)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, grade_level, section`,
-      [req.user.schoolId, parentId, studentName, gradeLevel, section]
+      `INSERT INTO students (school_id, parent_id, name, grade_level, section, student_number)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, grade_level, section, student_number`,
+      [req.user.schoolId, parentId, studentName, gradeLevel, section, studentNumber || null]
     );
-    
+
     res.json({
       success: true,
       message: 'Student added successfully',
       student: studentResult.rows[0]
     });
-    
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7b. DELETE STUDENT (Admin only)
+app.delete('/api/admin/students/:studentId', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { studentId } = req.params;
+
+  try {
+    const studentCheck = await client.query(
+      'SELECT id, parent_id FROM students WHERE id = $1 AND school_id = $2',
+      [studentId, req.user.schoolId]
+    );
+
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const parentId = studentCheck.rows[0].parent_id;
+
+    await client.query('DELETE FROM grades WHERE student_id = $1', [studentId]);
+    await client.query('DELETE FROM attendance WHERE student_id = $1', [studentId]);
+    await client.query('DELETE FROM students WHERE id = $1', [studentId]);
+
+    // Only remove the parent account if they have no other children left
+    const remainingChildren = await client.query(
+      'SELECT id FROM students WHERE parent_id = $1',
+      [parentId]
+    );
+
+    if (remainingChildren.rows.length === 0) {
+      await client.query('DELETE FROM users WHERE id = $1', [parentId]);
+    }
+
+    res.json({ success: true, message: 'Student deleted successfully' });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -549,6 +590,7 @@ Portal (requires token):
 Admin Only (requires token):
   GET    /api/admin/students       - List students
   POST   /api/admin/students       - Add student
+  DELETE /api/admin/students/:id   - Delete student
   POST   /api/admin/grades         - Add/update grades
   POST   /api/admin/announcements  - Create announcement
 

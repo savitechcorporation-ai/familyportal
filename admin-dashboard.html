@@ -357,9 +357,32 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Grade Level</label>
-              <input type="text" id="gradeLevel" placeholder="Grade 5" />
+              <label>Student ID Number</label>
+              <input type="text" id="studentNumber" placeholder="e.g. 2026-00123" />
             </div>
+            <div class="form-group">
+              <label>Grade Level</label>
+              <select id="gradeLevel">
+                <option value="">Select grade level</option>
+                <option value="Preschool">Preschool</option>
+                <option value="Kinder 1">Kinder 1</option>
+                <option value="Kinder 2">Kinder 2</option>
+                <option value="Grade 1">Grade 1</option>
+                <option value="Grade 2">Grade 2</option>
+                <option value="Grade 3">Grade 3</option>
+                <option value="Grade 4">Grade 4</option>
+                <option value="Grade 5">Grade 5</option>
+                <option value="Grade 6">Grade 6</option>
+                <option value="Grade 7">Grade 7</option>
+                <option value="Grade 8">Grade 8</option>
+                <option value="Grade 9">Grade 9</option>
+                <option value="Grade 10">Grade 10</option>
+                <option value="Grade 11">Grade 11</option>
+                <option value="Grade 12">Grade 12</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
               <label>Section</label>
               <input type="text" id="section" placeholder="Makinabang" />
@@ -367,17 +390,19 @@
           </div>
           <button class="btn btn-primary" onclick="addStudent()">Add Student</button>
         </div>
-        
+
         <div>
           <h3>Students List</h3>
           <table class="table">
             <thead>
               <tr>
                 <th>Student Name</th>
+                <th>Student #</th>
                 <th>Grade Level</th>
                 <th>Section</th>
                 <th>Parent Email</th>
                 <th>ID</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="studentsList"></tbody>
@@ -398,27 +423,27 @@
             </div>
             <div class="form-group">
               <label>Subject</label>
-              <input type="text" id="subject" placeholder="Filipino" />
+              <select id="subject" onchange="handleSubjectChange()"></select>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>Q1 Grade</label>
-              <input type="number" id="q1" placeholder="0" step="0.01" />
+              <select id="q1"></select>
             </div>
             <div class="form-group">
               <label>Q2 Grade</label>
-              <input type="number" id="q2" placeholder="0" step="0.01" />
+              <select id="q2"></select>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>Q3 Grade</label>
-              <input type="number" id="q3" placeholder="0" step="0.01" />
+              <select id="q3"></select>
             </div>
             <div class="form-group">
               <label>Q4 Grade</label>
-              <input type="number" id="q4" placeholder="0" step="0.01" />
+              <select id="q4"></select>
             </div>
           </div>
           <button class="btn btn-primary" onclick="addGrade()">Save Grade</button>
@@ -505,10 +530,60 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('adminScreen').style.display = 'flex';
     loadStudents();
   }
+
+  populateSubjectOptions();
+  populateGradeOptions();
 });
   const API_BASE = 'https://familyportal.onrender.com/api';
   let authToken = null;
   let schoolId = null;
+
+  const DEFAULT_SUBJECTS = [
+    'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan',
+    'MAPEH', 'Edukasyon sa Pagpapakatao', 'TLE/EPP', 'Mother Tongue', 'Computer/ICT'
+  ];
+
+  function getSubjectList() {
+    const custom = JSON.parse(localStorage.getItem('customSubjects') || '[]');
+    return DEFAULT_SUBJECTS.concat(custom.filter(s => !DEFAULT_SUBJECTS.includes(s)));
+  }
+
+  function populateSubjectOptions(selected) {
+    const select = document.getElementById('subject');
+    const subjects = getSubjectList();
+    select.innerHTML = subjects.map(s => `<option value="${s}">${s}</option>`).join('')
+      + `<option value="__add_new__">+ Add new subject...</option>`;
+    if (selected) select.value = selected;
+  }
+
+  function handleSubjectChange() {
+    const select = document.getElementById('subject');
+    if (select.value !== '__add_new__') return;
+
+    const newSubject = prompt('Enter the new subject name:');
+    select.value = getSubjectList()[0] || '';
+
+    if (!newSubject || !newSubject.trim()) return;
+
+    const trimmed = newSubject.trim();
+    const custom = JSON.parse(localStorage.getItem('customSubjects') || '[]');
+    if (!custom.includes(trimmed) && !DEFAULT_SUBJECTS.includes(trimmed)) {
+      custom.push(trimmed);
+      localStorage.setItem('customSubjects', JSON.stringify(custom));
+    }
+
+    populateSubjectOptions(trimmed);
+  }
+
+  function populateGradeOptions() {
+    let options = '<option value="">Not yet graded</option>';
+    for (let g = 100; g >= 50; g--) {
+      options += `<option value="${g}">${g}</option>`;
+    }
+    ['q1', 'q2', 'q3', 'q4'].forEach(id => {
+      document.getElementById(id).innerHTML = options;
+    });
+  }
   
   // Menu navigation
   document.querySelectorAll('.menu-btn').forEach(btn => {
@@ -590,10 +665,12 @@ window.addEventListener('DOMContentLoaded', () => {
       tbody.innerHTML = data.map(student => `
         <tr>
           <td>${student.name}</td>
+          <td>${student.student_number || ''}</td>
           <td>${student.grade_level || ''}</td>
           <td>${student.section || ''}</td>
           <td>${student.parent_email}</td>
           <td>${student.id}</td>
+          <td><button class="btn" style="background:#e74c3c;color:white;" onclick="deleteStudent(${student.id}, '${student.name.replace(/'/g, "\\'")}')">Delete</button></td>
         </tr>
       `).join('');
 
@@ -601,21 +678,46 @@ window.addEventListener('DOMContentLoaded', () => {
       console.error('Failed to load students:', error.message);
     }
   }
-  
+
+  // Delete Student
+  async function deleteStudent(studentId, studentName) {
+    if (!confirm(`Delete ${studentName} and all their records? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/students/${studentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        loadStudents();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+
   // Add Student
   async function addStudent() {
     const parentEmail = document.getElementById('parentEmail').value;
     const parentName = document.getElementById('parentName').value;
     const parentPassword = document.getElementById('parentPassword').value;
     const studentName = document.getElementById('studentName').value;
+    const studentNumber = document.getElementById('studentNumber').value;
     const gradeLevel = document.getElementById('gradeLevel').value;
     const section = document.getElementById('section').value;
-    
+
     if (!parentEmail || !studentName || !gradeLevel) {
       alert('Please fill required fields');
       return;
     }
-    
+
     try {
       const response = await fetch(`${API_BASE}/admin/students`, {
         method: 'POST',
@@ -624,7 +726,7 @@ window.addEventListener('DOMContentLoaded', () => {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          parentEmail, parentName, parentPassword, studentName, gradeLevel, section
+          parentEmail, parentName, parentPassword, studentName, studentNumber, gradeLevel, section
         })
       });
       
@@ -635,6 +737,7 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentSuccess').style.display = 'block';
         document.getElementById('parentEmail').value = '';
         document.getElementById('studentName').value = '';
+        document.getElementById('studentNumber').value = '';
         document.getElementById('gradeLevel').value = '';
         document.getElementById('section').value = '';
         loadStudents();

@@ -22,13 +22,15 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS students (
-  id          SERIAL PRIMARY KEY,
-  school_id   INTEGER NOT NULL REFERENCES schools(id),
-  parent_id   INTEGER REFERENCES users(id),
-  name        TEXT NOT NULL,
-  grade_level TEXT,
-  section     TEXT,
-  photo       TEXT
+  id             SERIAL PRIMARY KEY,
+  school_id      INTEGER NOT NULL REFERENCES schools(id),
+  parent_id      INTEGER REFERENCES users(id),
+  name           TEXT NOT NULL,
+  grade_level    TEXT,
+  section        TEXT,
+  photo          TEXT,
+  student_number TEXT,
+  UNIQUE (school_id, student_number)
 );
 
 CREATE TABLE IF NOT EXISTS grades (
