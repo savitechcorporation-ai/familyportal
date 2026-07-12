@@ -328,7 +328,7 @@ app.get('/api/admin/students', verifyToken, async (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  const { gradeLevel, search, status } = req.query;
+  const { gradeLevel, search, status, quarterId } = req.query;
 
   try {
     const conditions = ['s.school_id = $1'];
@@ -347,15 +347,36 @@ app.get('/api/admin/students', verifyToken, async (req, res) => {
       conditions.push(`(s.name ILIKE $${params.length} OR s.student_number ILIKE $${params.length})`);
     }
 
+    // Optional per-quarter average (drives the "Q avg: XX" line in the UI)
+    let averageSelect = 'NULL AS average';
+    let averageJoin = '';
+    if (quarterId) {
+      params.push(quarterId);
+      averageSelect = `ga.avg_score AS average`;
+      averageJoin = `LEFT JOIN (
+        SELECT student_id, AVG(score) AS avg_score
+        FROM grades WHERE quarter_id = $${params.length} AND score IS NOT NULL
+        GROUP BY student_id
+      ) ga ON ga.student_id = s.id`;
+    }
+
     const students = await client.query(
       `SELECT s.id, s.name, s.grade_level, s.section, s.student_number, s.adviser, s.status,
-              u.email AS parent_email, u.name AS parent_name, u.phone AS parent_phone
+              u.email AS parent_email, u.name AS parent_name, u.phone AS parent_phone,
+              ${averageSelect}
        FROM students s
        JOIN users u ON s.parent_id = u.id
+       ${averageJoin}
        WHERE ${conditions.join(' AND ')}
        ORDER BY s.name ASC`,
       params
     );
+
+    students.rows.forEach(s => {
+      if (s.average !== null && s.average !== undefined) {
+        s.average = Math.round(parseFloat(s.average) * 100) / 100;
+      }
+    });
 
     res.json(students.rows);
 
@@ -615,6 +636,362 @@ app.get('/api/admin/overview', verifyToken, async (req, res) => {
         attendanceRate: r.rate !== null ? Math.round(parseFloat(r.rate) * 10000) / 100 : null
       }))
     });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== GRADE ENTRY (Admin only) ====================
+
+// 7f. LIST SUBJECTS for a grade level
+app.get('/api/admin/subjects', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { gradeLevel } = req.query;
+  if (!gradeLevel) {
+    return res.status(400).json({ error: 'gradeLevel is required' });
+  }
+
+  try {
+    const subjects = await client.query(
+      `SELECT id, code, name, teacher_name
+       FROM subjects
+       WHERE school_id = $1 AND grade_level = $2
+       ORDER BY name ASC`,
+      [req.user.schoolId, gradeLevel]
+    );
+
+    res.json(subjects.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7g. BULK GRADES for a grade level + subject + quarter
+app.get('/api/admin/grades', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { gradeLevel, subjectCode, quarterId } = req.query;
+  if (!gradeLevel || !subjectCode || !quarterId) {
+    return res.status(400).json({ error: 'gradeLevel, subjectCode, and quarterId are required' });
+  }
+
+  try {
+    const rows = await client.query(
+      `SELECT s.id AS student_id, s.name, s.section, g.score
+       FROM students s
+       LEFT JOIN grades g ON g.student_id = s.id AND g.quarter_id = $1 AND g.subject_code = $2
+       WHERE s.school_id = $3 AND s.grade_level = $4 AND s.status = 'active'
+       ORDER BY s.name ASC`,
+      [quarterId, subjectCode, req.user.schoolId, gradeLevel]
+    );
+
+    res.json(rows.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7h. SAVE ONE GRADE
+app.put('/api/admin/grades/:studentId/:quarterId/:subjectCode', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { studentId, quarterId, subjectCode } = req.params;
+  const { score } = req.body;
+
+  try {
+    const studentCheck = await client.query(
+      'SELECT id FROM students WHERE id = $1 AND school_id = $2',
+      [studentId, req.user.schoolId]
+    );
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    await client.query(
+      `INSERT INTO grades (student_id, quarter_id, subject_code, score)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (student_id, quarter_id, subject_code) DO UPDATE SET score = $4`,
+      [studentId, quarterId, subjectCode, score]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== ATTENDANCE (Admin only) ====================
+
+// 7i. BULK ATTENDANCE for a grade level + quarter
+app.get('/api/admin/attendance', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { gradeLevel, quarterId } = req.query;
+  if (!quarterId) {
+    return res.status(400).json({ error: 'quarterId is required' });
+  }
+
+  try {
+    const conditions = [`s.school_id = $1`, `s.status = 'active'`];
+    const params = [req.user.schoolId, quarterId];
+
+    if (gradeLevel) {
+      params.push(gradeLevel);
+      conditions.push(`s.grade_level = $${params.length}`);
+    }
+
+    const rows = await client.query(
+      `SELECT s.id AS student_id, s.name, s.grade_level, s.section,
+              a.present, a.absent, a.tardy, a.school_days
+       FROM students s
+       LEFT JOIN attendance a ON a.student_id = s.id AND a.quarter_id = $2
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY s.name ASC`,
+      params
+    );
+
+    res.json(rows.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7j. SAVE ONE STUDENT'S ATTENDANCE for a quarter
+app.put('/api/admin/attendance/:studentId/:quarterId', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { studentId, quarterId } = req.params;
+  const { present, absent, tardy, schoolDays } = req.body;
+
+  try {
+    const studentCheck = await client.query(
+      'SELECT id FROM students WHERE id = $1 AND school_id = $2',
+      [studentId, req.user.schoolId]
+    );
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    await client.query(
+      `INSERT INTO attendance (student_id, quarter_id, present, absent, tardy, school_days)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (student_id, quarter_id) DO UPDATE SET
+       present = $3, absent = $4, tardy = $5, school_days = $6`,
+      [studentId, quarterId, present, absent, tardy, schoolDays]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== REMARKS & VALUES (Admin only) ====================
+
+// 7k. LIST REMARKS + VALUES for a quarter (all active students)
+app.get('/api/admin/remarks-values', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { quarterId } = req.query;
+  if (!quarterId) {
+    return res.status(400).json({ error: 'quarterId is required' });
+  }
+
+  try {
+    const students = await client.query(
+      `SELECT s.id, s.name, s.grade_level, s.section, r.body AS remarks
+       FROM students s
+       LEFT JOIN remarks r ON r.student_id = s.id AND r.quarter_id = $1
+       WHERE s.school_id = $2 AND s.status = 'active'
+       ORDER BY s.name ASC`,
+      [quarterId, req.user.schoolId]
+    );
+
+    const valuesResult = await client.query(
+      `SELECT vr.student_id, vr.core_value, vr.rating
+       FROM values_ratings vr
+       JOIN students s ON s.id = vr.student_id
+       WHERE vr.quarter_id = $1 AND s.school_id = $2`,
+      [quarterId, req.user.schoolId]
+    );
+
+    const valuesByStudent = {};
+    valuesResult.rows.forEach(v => {
+      if (!valuesByStudent[v.student_id]) valuesByStudent[v.student_id] = {};
+      valuesByStudent[v.student_id][v.core_value] = v.rating;
+    });
+
+    res.json(students.rows.map(s => ({
+      ...s,
+      values: valuesByStudent[s.id] || {}
+    })));
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7l. SAVE REMARKS for a student/quarter
+app.put('/api/admin/remarks/:studentId/:quarterId', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { studentId, quarterId } = req.params;
+  const { body } = req.body;
+
+  try {
+    const studentCheck = await client.query(
+      'SELECT id FROM students WHERE id = $1 AND school_id = $2',
+      [studentId, req.user.schoolId]
+    );
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    await client.query(
+      `INSERT INTO remarks (student_id, quarter_id, body)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (student_id, quarter_id) DO UPDATE SET body = $3`,
+      [studentId, quarterId, body]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7m. SAVE CORE VALUES RATINGS for a student/quarter (all 4 at once)
+app.put('/api/admin/values/:studentId/:quarterId', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { studentId, quarterId } = req.params;
+  const { values } = req.body; // { 'Maka-Diyos': 'AO', ... }
+
+  try {
+    const studentCheck = await client.query(
+      'SELECT id FROM students WHERE id = $1 AND school_id = $2',
+      [studentId, req.user.schoolId]
+    );
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    for (const [coreValue, rating] of Object.entries(values || {})) {
+      await client.query(
+        `INSERT INTO values_ratings (student_id, quarter_id, core_value, rating)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (student_id, quarter_id, core_value) DO UPDATE SET rating = $4`,
+        [studentId, quarterId, coreValue, rating]
+      );
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== SCHOOL SETTINGS (Admin only) ====================
+
+// 7n. GET SCHOOL INFO
+app.get('/api/admin/school', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const result = await client.query(
+      'SELECT id, name, address, director, registrar FROM schools WHERE id = $1',
+      [req.user.schoolId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'School not found' });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7o. UPDATE SCHOOL INFO
+app.patch('/api/admin/school', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { name, address, director, registrar } = req.body;
+
+  try {
+    const result = await client.query(
+      `UPDATE schools
+       SET name = COALESCE($1, name), address = COALESCE($2, address),
+           director = COALESCE($3, director), registrar = COALESCE($4, registrar)
+       WHERE id = $5
+       RETURNING id, name, address, director, registrar`,
+      [name, address, director, registrar, req.user.schoolId]
+    );
+
+    res.json({ success: true, school: result.rows[0] });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7p. CYCLE/SET A QUARTER'S STATUS
+app.patch('/api/admin/quarters/:quarterId', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { quarterId } = req.params;
+  const { status } = req.body;
+
+  if (!['not_started', 'in_progress', 'released'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    const result = await client.query(
+      `UPDATE quarters SET status = $1
+       WHERE id = $2 AND school_id = $3
+       RETURNING id, school_year, label, short, sort_order, status`,
+      [status, quarterId, req.user.schoolId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Quarter not found' });
+    }
+
+    res.json({ success: true, quarter: result.rows[0] });
 
   } catch (err) {
     res.status(500).json({ error: err.message });

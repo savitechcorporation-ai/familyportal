@@ -8,6 +8,9 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS schools (
   id         SERIAL PRIMARY KEY,
   name       TEXT NOT NULL,
+  address    TEXT,
+  director   TEXT,
+  registrar  TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
