@@ -18,6 +18,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 const { Client } = require('pg');
 require('dotenv').config();
 
@@ -31,6 +32,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// Clean URL for the new admin portal (the file itself is still reachable at /admin-portal.html)
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-portal.html'));
+});
 
 // ==================== DATABASE SETUP ====================
 
@@ -219,12 +225,23 @@ app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Quarters are real rows now (not q1-q4 columns) so each can have its own
+    // release status. Parents only see released quarters; staff see all.
+    // Pivoted back into {subject, q1, q2, q3, q4} shape for frontend compatibility.
     const grades = await client.query(
-      `SELECT subject, q1, q2, q3, q4
-       FROM grades
-       WHERE student_id = $1 AND school_year = $2
-       ORDER BY subject ASC`,
-      [studentId, schoolYear]
+      `SELECT
+         g.subject_code AS subject,
+         MAX(CASE WHEN q.sort_order = 1 THEN g.score END) AS q1,
+         MAX(CASE WHEN q.sort_order = 2 THEN g.score END) AS q2,
+         MAX(CASE WHEN q.sort_order = 3 THEN g.score END) AS q3,
+         MAX(CASE WHEN q.sort_order = 4 THEN g.score END) AS q4
+       FROM grades g
+       JOIN quarters q ON q.id = g.quarter_id
+       WHERE g.student_id = $1 AND q.school_year = $2
+         AND ($3 = true OR q.status = 'released')
+       GROUP BY g.subject_code
+       ORDER BY g.subject_code ASC`,
+      [studentId, schoolYear, req.user.role !== 'parent']
     );
 
     res.json(grades.rows);
@@ -255,12 +272,21 @@ app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Same release-gating as grades. Aliased to the field names the
+    // frontend already expects (it just sums these, doesn't care that this
+    // used to be per-month and is now per-quarter).
     const attendance = await client.query(
-      `SELECT month, present_days, absent_days, tardy_days
-       FROM attendance
-       WHERE student_id = $1 AND school_year = $2
-       ORDER BY month DESC`,
-      [studentId, schoolYear]
+      `SELECT
+         q.short AS month,
+         a.present AS present_days,
+         a.absent AS absent_days,
+         a.tardy AS tardy_days
+       FROM attendance a
+       JOIN quarters q ON q.id = a.quarter_id
+       WHERE a.student_id = $1 AND q.school_year = $2
+         AND ($3 = true OR q.status = 'released')
+       ORDER BY q.sort_order DESC`,
+      [studentId, schoolYear, req.user.role !== 'parent']
     );
 
     res.json(attendance.rows);
@@ -302,14 +328,33 @@ app.get('/api/admin/students', verifyToken, async (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
+  const { gradeLevel, search, status } = req.query;
+
   try {
+    const conditions = ['s.school_id = $1'];
+    const params = [req.user.schoolId];
+
+    if (gradeLevel) {
+      params.push(gradeLevel);
+      conditions.push(`s.grade_level = $${params.length}`);
+    }
+    if (status) {
+      params.push(status);
+      conditions.push(`s.status = $${params.length}`);
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      conditions.push(`(s.name ILIKE $${params.length} OR s.student_number ILIKE $${params.length})`);
+    }
+
     const students = await client.query(
-      `SELECT s.id, s.name, s.grade_level, s.section, s.student_number, u.email AS parent_email
+      `SELECT s.id, s.name, s.grade_level, s.section, s.student_number, s.adviser, s.status,
+              u.email AS parent_email, u.name AS parent_name, u.phone AS parent_phone
        FROM students s
        JOIN users u ON s.parent_id = u.id
-       WHERE s.school_id = $1
+       WHERE ${conditions.join(' AND ')}
        ORDER BY s.name ASC`,
-      [req.user.schoolId]
+      params
     );
 
     res.json(students.rows);
@@ -325,7 +370,7 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
   
-  const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword, studentNumber } = req.body;
+  const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword, studentNumber, adviser } = req.body;
 
   if (!studentNumber) {
     return res.status(400).json({ error: 'Student ID Number is required' });
@@ -345,10 +390,10 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
 
     // Create student
     const studentResult = await client.query(
-      `INSERT INTO students (school_id, parent_id, name, grade_level, section, student_number)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, name, grade_level, section, student_number`,
-      [req.user.schoolId, parentId, studentName, gradeLevel, section, studentNumber]
+      `INSERT INTO students (school_id, parent_id, name, grade_level, section, student_number, adviser)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, grade_level, section, student_number, adviser, status`,
+      [req.user.schoolId, parentId, studentName, gradeLevel, section, studentNumber, adviser || null]
     );
 
     res.json({
@@ -384,6 +429,8 @@ app.delete('/api/admin/students/:studentId', verifyToken, async (req, res) => {
 
     await client.query('DELETE FROM grades WHERE student_id = $1', [studentId]);
     await client.query('DELETE FROM attendance WHERE student_id = $1', [studentId]);
+    await client.query('DELETE FROM remarks WHERE student_id = $1', [studentId]);
+    await client.query('DELETE FROM values_ratings WHERE student_id = $1', [studentId]);
     await client.query('DELETE FROM students WHERE id = $1', [studentId]);
 
     // Only remove the parent account if they have no other children left
@@ -403,6 +450,177 @@ app.delete('/api/admin/students/:studentId', verifyToken, async (req, res) => {
   }
 });
 
+// 7c. UPDATE STUDENT (Admin only) - adviser and/or active/inactive status
+app.patch('/api/admin/students/:studentId', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { studentId } = req.params;
+  const { adviser, status } = req.body;
+
+  if (status && !['active', 'inactive'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    const studentCheck = await client.query(
+      'SELECT id FROM students WHERE id = $1 AND school_id = $2',
+      [studentId, req.user.schoolId]
+    );
+
+    if (studentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const result = await client.query(
+      `UPDATE students
+       SET adviser = COALESCE($1, adviser), status = COALESCE($2, status)
+       WHERE id = $3
+       RETURNING id, name, grade_level, section, student_number, adviser, status`,
+      [adviser, status, studentId]
+    );
+
+    res.json({ success: true, student: result.rows[0] });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7d. LIST QUARTERS (Admin only)
+app.get('/api/admin/quarters', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const quarters = await client.query(
+      `SELECT id, school_year, label, short, sort_order, status
+       FROM quarters
+       WHERE school_id = $1
+       ORDER BY school_year DESC, sort_order ASC`,
+      [req.user.schoolId]
+    );
+
+    res.json(quarters.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7e. OVERVIEW STATS (Admin only) - always computed live, never cached
+app.get('/api/admin/overview', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    let quarterId = req.query.quarterId;
+
+    if (!quarterId) {
+      const latestQuarter = await client.query(
+        `SELECT id FROM quarters WHERE school_id = $1
+         ORDER BY school_year DESC, sort_order DESC LIMIT 1`,
+        [req.user.schoolId]
+      );
+      if (latestQuarter.rows.length === 0) {
+        return res.status(404).json({ error: 'No quarters set up for this school yet' });
+      }
+      quarterId = latestQuarter.rows[0].id;
+    }
+
+    const quarterResult = await client.query(
+      'SELECT id, label, short, school_year, status FROM quarters WHERE id = $1 AND school_id = $2',
+      [quarterId, req.user.schoolId]
+    );
+
+    if (quarterResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Quarter not found' });
+    }
+
+    const quarter = quarterResult.rows[0];
+
+    const activeCountResult = await client.query(
+      `SELECT COUNT(*) FROM students WHERE school_id = $1 AND status = 'active'`,
+      [req.user.schoolId]
+    );
+    const activeStudents = parseInt(activeCountResult.rows[0].count);
+
+    const classAverageResult = await client.query(
+      `SELECT AVG(g.score) AS avg
+       FROM grades g
+       JOIN students s ON s.id = g.student_id
+       WHERE g.quarter_id = $1 AND s.school_id = $2 AND s.status = 'active' AND g.score IS NOT NULL`,
+      [quarterId, req.user.schoolId]
+    );
+    const classAverage = classAverageResult.rows[0].avg !== null
+      ? Math.round(parseFloat(classAverageResult.rows[0].avg) * 100) / 100
+      : null;
+
+    const attendanceRateResult = await client.query(
+      `SELECT AVG(a.present::NUMERIC / NULLIF(a.school_days, 0)) AS rate
+       FROM attendance a
+       JOIN students s ON s.id = a.student_id
+       WHERE a.quarter_id = $1 AND s.school_id = $2 AND s.status = 'active'`,
+      [quarterId, req.user.schoolId]
+    );
+    const attendanceRate = attendanceRateResult.rows[0].rate !== null
+      ? Math.round(parseFloat(attendanceRateResult.rows[0].rate) * 10000) / 100
+      : null;
+
+    const enrollmentResult = await client.query(
+      `SELECT grade_level, COUNT(*) AS count
+       FROM students
+       WHERE school_id = $1 AND status = 'active'
+       GROUP BY grade_level
+       ORDER BY grade_level ASC`,
+      [req.user.schoolId]
+    );
+
+    // Active students whose quarter average < 80 or attendance rate < 90%,
+    // computed live from grades/attendance - never a stored/cached value.
+    const attentionResult = await client.query(
+      `SELECT s.id, s.name, s.grade_level, s.section, ga.avg_score, ar.rate
+       FROM students s
+       LEFT JOIN (
+         SELECT student_id, AVG(score) AS avg_score
+         FROM grades WHERE quarter_id = $1 AND score IS NOT NULL
+         GROUP BY student_id
+       ) ga ON ga.student_id = s.id
+       LEFT JOIN (
+         SELECT student_id, present::NUMERIC / NULLIF(school_days, 0) AS rate
+         FROM attendance WHERE quarter_id = $1
+       ) ar ON ar.student_id = s.id
+       WHERE s.school_id = $2 AND s.status = 'active'
+         AND ((ga.avg_score IS NOT NULL AND ga.avg_score < 80)
+           OR (ar.rate IS NOT NULL AND ar.rate < 0.9))
+       ORDER BY s.name ASC`,
+      [quarterId, req.user.schoolId]
+    );
+
+    res.json({
+      quarter,
+      activeStudents,
+      classAverage,
+      attendanceRate,
+      enrollmentByGradeLevel: enrollmentResult.rows,
+      studentsNeedingAttention: attentionResult.rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        grade_level: r.grade_level,
+        section: r.section,
+        average: r.avg_score !== null ? Math.round(parseFloat(r.avg_score) * 100) / 100 : null,
+        attendanceRate: r.rate !== null ? Math.round(parseFloat(r.rate) * 10000) / 100 : null
+      }))
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 8. ADD GRADES (Admin only)
 app.post('/api/admin/grades', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
@@ -413,37 +631,39 @@ app.post('/api/admin/grades', verifyToken, async (req, res) => {
   const schoolYear = req.body.schoolYear || '2026-2027';
 
   try {
-    // Check if grade exists for this subject/year
-    const existingGrade = await client.query(
-      'SELECT id FROM grades WHERE student_id = $1 AND subject = $2 AND school_year = $3',
-      [studentId, subject, schoolYear]
+    // Quarters are real rows now - resolve this school's Q1-Q4 ids for the
+    // given school_year, then upsert one row per non-null quarter score.
+    const quartersResult = await client.query(
+      `SELECT id, sort_order FROM quarters WHERE school_id = $1 AND school_year = $2`,
+      [req.user.schoolId, schoolYear]
     );
 
-    let result;
-    if (existingGrade.rows.length > 0) {
-      // Update existing grade
-      result = await client.query(
-        `UPDATE grades SET q1 = $1, q2 = $2, q3 = $3, q4 = $4
-         WHERE student_id = $5 AND subject = $6 AND school_year = $7
-         RETURNING subject, q1, q2, q3, q4`,
-        [q1, q2, q3, q4, studentId, subject, schoolYear]
+    const quarterIdByOrder = {};
+    quartersResult.rows.forEach(q => { quarterIdByOrder[q.sort_order] = q.id; });
+
+    const scoreByOrder = { 1: q1, 2: q2, 3: q3, 4: q4 };
+    const saved = { subject };
+
+    for (const order of [1, 2, 3, 4]) {
+      const score = scoreByOrder[order];
+      const quarterId = quarterIdByOrder[order];
+      if (score === undefined || score === null || !quarterId) continue;
+
+      await client.query(
+        `INSERT INTO grades (student_id, quarter_id, subject_code, score)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (student_id, quarter_id, subject_code) DO UPDATE SET score = $4`,
+        [studentId, quarterId, subject, score]
       );
-    } else {
-      // Insert new grade
-      result = await client.query(
-        `INSERT INTO grades (student_id, subject, q1, q2, q3, q4, school_year)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING subject, q1, q2, q3, q4`,
-        [studentId, subject, q1, q2, q3, q4, schoolYear]
-      );
+      saved['q' + order] = score;
     }
-    
+
     res.json({
       success: true,
       message: 'Grade saved successfully',
-      grade: result.rows[0]
+      grade: saved
     });
-    
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -488,16 +708,20 @@ app.post('/api/sync-checked-attendance', verifyToken, async (req, res) => {
   const schoolYear = req.body.schoolYear || '2026-2027';
 
   try {
-    // Check if attendance record exists
+    // CheckEd's data is month-based; the new admin portal's attendance is
+    // quarter-based (see attendance table). There's no reliable month-to-
+    // quarter mapping without a real school-calendar config, so CheckEd
+    // sync keeps writing to the old month-based table (renamed, not
+    // dropped, by the quarters migration) rather than guessing one.
     const existing = await client.query(
-      'SELECT id FROM attendance WHERE student_id = $1 AND month = $2 AND school_year = $3',
+      'SELECT id FROM attendance_legacy WHERE student_id = $1 AND month = $2 AND school_year = $3',
       [studentId, month, schoolYear]
     );
 
     let result;
     if (existing.rows.length > 0) {
       result = await client.query(
-        `UPDATE attendance
+        `UPDATE attendance_legacy
          SET present_days = $1, absent_days = $2, tardy_days = $3
          WHERE student_id = $4 AND month = $5 AND school_year = $6
          RETURNING student_id, month, present_days, absent_days, tardy_days`,
@@ -505,7 +729,7 @@ app.post('/api/sync-checked-attendance', verifyToken, async (req, res) => {
       );
     } else {
       result = await client.query(
-        `INSERT INTO attendance (student_id, month, present_days, absent_days, tardy_days, school_year)
+        `INSERT INTO attendance_legacy (student_id, month, present_days, absent_days, tardy_days, school_year)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING student_id, month, present_days, absent_days, tardy_days`,
         [studentId, month, presentDays, absentDays, tardyDays, schoolYear]
@@ -535,7 +759,7 @@ app.post('/api/sync-checked-bulk', verifyToken, async (req, res) => {
     for (const record of attendanceData) {
       const schoolYear = record.schoolYear || '2026-2027';
       await client.query(
-        `INSERT INTO attendance (student_id, month, present_days, absent_days, tardy_days, school_year)
+        `INSERT INTO attendance_legacy (student_id, month, present_days, absent_days, tardy_days, school_year)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (student_id, month, school_year) DO UPDATE SET
          present_days = $3, absent_days = $4, tardy_days = $5`,

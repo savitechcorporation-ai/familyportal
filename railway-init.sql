@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS users (
   name      TEXT NOT NULL,
   email     TEXT NOT NULL,
   password  TEXT NOT NULL,
-  role      TEXT NOT NULL CHECK (role IN ('admin', 'parent'))
+  phone     TEXT,
+  role      TEXT NOT NULL CHECK (role IN ('admin', 'parent', 'teacher'))
 );
 
 CREATE TABLE IF NOT EXISTS students (
@@ -34,30 +35,70 @@ CREATE TABLE IF NOT EXISTS students (
   section        TEXT,
   photo          TEXT,
   student_number TEXT,
+  adviser        TEXT,
+  status         TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
   UNIQUE (school_id, student_number)
 );
 
-CREATE TABLE IF NOT EXISTS grades (
+-- Quarters are real rows (not columns) so each one can carry its own
+-- release status - the parent portal only shows a quarter once it's
+-- status = 'released'.
+CREATE TABLE IF NOT EXISTS quarters (
   id          SERIAL PRIMARY KEY,
-  student_id  INTEGER NOT NULL REFERENCES students(id),
-  subject     TEXT NOT NULL,
-  school_year TEXT NOT NULL DEFAULT '2026-2027',
-  q1          NUMERIC,
-  q2          NUMERIC,
-  q3          NUMERIC,
-  q4          NUMERIC,
-  UNIQUE (student_id, subject, school_year)
+  school_id   INTEGER NOT NULL REFERENCES schools(id),
+  school_year TEXT NOT NULL,
+  label       TEXT NOT NULL,
+  short       TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'released')),
+  UNIQUE (school_id, school_year, sort_order)
+);
+
+CREATE TABLE IF NOT EXISTS subjects (
+  id           SERIAL PRIMARY KEY,
+  school_id    INTEGER NOT NULL REFERENCES schools(id),
+  grade_level  TEXT NOT NULL,
+  code         TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  teacher_name TEXT,
+  UNIQUE (school_id, grade_level, code)
+);
+
+CREATE TABLE IF NOT EXISTS grades (
+  id           SERIAL PRIMARY KEY,
+  student_id   INTEGER NOT NULL REFERENCES students(id),
+  quarter_id   INTEGER NOT NULL REFERENCES quarters(id),
+  subject_code TEXT NOT NULL,
+  score        NUMERIC,
+  UNIQUE (student_id, quarter_id, subject_code)
 );
 
 CREATE TABLE IF NOT EXISTS attendance (
-  id           SERIAL PRIMARY KEY,
-  student_id   INTEGER NOT NULL REFERENCES students(id),
-  month        TEXT NOT NULL,
-  school_year  TEXT NOT NULL DEFAULT '2026-2027',
-  present_days INTEGER,
-  absent_days  INTEGER,
-  tardy_days   INTEGER,
-  UNIQUE (student_id, month, school_year)
+  id          SERIAL PRIMARY KEY,
+  student_id  INTEGER NOT NULL REFERENCES students(id),
+  quarter_id  INTEGER NOT NULL REFERENCES quarters(id),
+  present     INTEGER,
+  absent      INTEGER,
+  tardy       INTEGER,
+  school_days INTEGER,
+  UNIQUE (student_id, quarter_id)
+);
+
+CREATE TABLE IF NOT EXISTS remarks (
+  id         SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL REFERENCES students(id),
+  quarter_id INTEGER NOT NULL REFERENCES quarters(id),
+  body       TEXT,
+  UNIQUE (student_id, quarter_id)
+);
+
+CREATE TABLE IF NOT EXISTS values_ratings (
+  id         SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL REFERENCES students(id),
+  quarter_id INTEGER NOT NULL REFERENCES quarters(id),
+  core_value TEXT NOT NULL,
+  rating     TEXT CHECK (rating IN ('AO', 'SO', 'RO', 'NO')),
+  UNIQUE (student_id, quarter_id, core_value)
 );
 
 CREATE TABLE IF NOT EXISTS announcements (
@@ -86,5 +127,43 @@ SELECT 1, 'Admin', 'admin@qcc-school.edu.ph',
 WHERE NOT EXISTS (
   SELECT 1 FROM users WHERE school_id = 1 AND email = 'admin@qcc-school.edu.ph'
 );
+
+-- Default quarters for the demo school year
+INSERT INTO quarters (school_id, school_year, label, short, sort_order)
+SELECT 1, '2026-2027', label, short, sort_order
+FROM (VALUES
+  ('Quarter 1', 'Q1', 1),
+  ('Quarter 2', 'Q2', 2),
+  ('Quarter 3', 'Q3', 3),
+  ('Quarter 4', 'Q4', 4)
+) AS q(label, short, sort_order)
+ON CONFLICT (school_id, school_year, sort_order) DO NOTHING;
+
+-- Default DepEd subject lists: elementary (Preschool-Grade 6), junior high
+-- (Grade 7-10, adds TLE). Grade 11-12 seeded with the junior-high list as a
+-- placeholder - real Senior High subjects vary by strand and aren't covered
+-- here yet.
+INSERT INTO subjects (school_id, grade_level, code, name)
+SELECT 1, gl, code, name
+FROM (VALUES
+  ('Preschool'), ('Kinder 1'), ('Kinder 2'),
+  ('Grade 1'), ('Grade 2'), ('Grade 3'), ('Grade 4'), ('Grade 5'), ('Grade 6')
+) AS elem(gl)
+CROSS JOIN (VALUES
+  ('FIL', 'Filipino'), ('ENG', 'English'), ('MATH', 'Mathematics'), ('SCI', 'Science'),
+  ('AP', 'Araling Panlipunan'), ('ESP', 'Edukasyon sa Pagpapakatao'), ('MAPEH', 'MAPEH')
+) AS subj(code, name)
+ON CONFLICT (school_id, grade_level, code) DO NOTHING;
+
+INSERT INTO subjects (school_id, grade_level, code, name)
+SELECT 1, gl, code, name
+FROM (VALUES
+  ('Grade 7'), ('Grade 8'), ('Grade 9'), ('Grade 10'), ('Grade 11'), ('Grade 12')
+) AS jhs(gl)
+CROSS JOIN (VALUES
+  ('FIL', 'Filipino'), ('ENG', 'English'), ('MATH', 'Mathematics'), ('SCI', 'Science'),
+  ('AP', 'Araling Panlipunan'), ('ESP', 'Edukasyon sa Pagpapakatao'), ('MAPEH', 'MAPEH'), ('TLE', 'TLE')
+) AS subj(code, name)
+ON CONFLICT (school_id, grade_level, code) DO NOTHING;
 
 COMMIT;
