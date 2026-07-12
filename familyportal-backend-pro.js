@@ -204,7 +204,8 @@ app.post('/api/login', async (req, res) => {
 // 3. GET STUDENT GRADES
 app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
   const { studentId } = req.params;
-  
+  const schoolYear = req.query.schoolYear || '2026-2027';
+
   try {
     // Verify student belongs to user's school (and to this parent, if requester is a parent)
     const studentCheck = await client.query(
@@ -224,9 +225,9 @@ app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
     const grades = await client.query(
       `SELECT subject, q1, q2, q3, q4
        FROM grades
-       WHERE student_id = $1
+       WHERE student_id = $1 AND school_year = $2
        ORDER BY subject ASC`,
-      [studentId]
+      [studentId, schoolYear]
     );
 
     res.json(grades.rows);
@@ -239,6 +240,7 @@ app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
 // 4. GET STUDENT ATTENDANCE
 app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
   const { studentId } = req.params;
+  const schoolYear = req.query.schoolYear || '2026-2027';
 
   try {
     // Verify student belongs to user's school (and to this parent, if requester is a parent)
@@ -259,9 +261,9 @@ app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
     const attendance = await client.query(
       `SELECT month, present_days, absent_days, tardy_days
        FROM attendance
-       WHERE student_id = $1
+       WHERE student_id = $1 AND school_year = $2
        ORDER BY month DESC`,
-      [studentId]
+      [studentId, schoolYear]
     );
 
     res.json(attendance.rows);
@@ -375,30 +377,31 @@ app.post('/api/admin/grades', verifyToken, async (req, res) => {
   }
   
   const { studentId, subject, q1, q2, q3, q4 } = req.body;
-  
+  const schoolYear = req.body.schoolYear || '2026-2027';
+
   try {
-    // Check if grade exists for this subject
+    // Check if grade exists for this subject/year
     const existingGrade = await client.query(
-      'SELECT id FROM grades WHERE student_id = $1 AND subject = $2',
-      [studentId, subject]
+      'SELECT id FROM grades WHERE student_id = $1 AND subject = $2 AND school_year = $3',
+      [studentId, subject, schoolYear]
     );
-    
+
     let result;
     if (existingGrade.rows.length > 0) {
       // Update existing grade
       result = await client.query(
         `UPDATE grades SET q1 = $1, q2 = $2, q3 = $3, q4 = $4
-         WHERE student_id = $5 AND subject = $6
+         WHERE student_id = $5 AND subject = $6 AND school_year = $7
          RETURNING subject, q1, q2, q3, q4`,
-        [q1, q2, q3, q4, studentId, subject]
+        [q1, q2, q3, q4, studentId, subject, schoolYear]
       );
     } else {
       // Insert new grade
       result = await client.query(
-        `INSERT INTO grades (student_id, subject, q1, q2, q3, q4)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO grades (student_id, subject, q1, q2, q3, q4, school_year)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING subject, q1, q2, q3, q4`,
-        [studentId, subject, q1, q2, q3, q4]
+        [studentId, subject, q1, q2, q3, q4, schoolYear]
       );
     }
     
@@ -449,29 +452,30 @@ app.post('/api/sync-checked-attendance', verifyToken, async (req, res) => {
   }
   
   const { studentId, month, presentDays, absentDays, tardyDays } = req.body;
-  
+  const schoolYear = req.body.schoolYear || '2026-2027';
+
   try {
     // Check if attendance record exists
     const existing = await client.query(
-      'SELECT id FROM attendance WHERE student_id = $1 AND month = $2',
-      [studentId, month]
+      'SELECT id FROM attendance WHERE student_id = $1 AND month = $2 AND school_year = $3',
+      [studentId, month, schoolYear]
     );
-    
+
     let result;
     if (existing.rows.length > 0) {
       result = await client.query(
-        `UPDATE attendance 
+        `UPDATE attendance
          SET present_days = $1, absent_days = $2, tardy_days = $3
-         WHERE student_id = $4 AND month = $5
+         WHERE student_id = $4 AND month = $5 AND school_year = $6
          RETURNING student_id, month, present_days, absent_days, tardy_days`,
-        [presentDays, absentDays, tardyDays, studentId, month]
+        [presentDays, absentDays, tardyDays, studentId, month, schoolYear]
       );
     } else {
       result = await client.query(
-        `INSERT INTO attendance (student_id, month, present_days, absent_days, tardy_days)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO attendance (student_id, month, present_days, absent_days, tardy_days, school_year)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING student_id, month, present_days, absent_days, tardy_days`,
-        [studentId, month, presentDays, absentDays, tardyDays]
+        [studentId, month, presentDays, absentDays, tardyDays, schoolYear]
       );
     }
     
@@ -496,12 +500,13 @@ app.post('/api/sync-checked-bulk', verifyToken, async (req, res) => {
   
   try {
     for (const record of attendanceData) {
+      const schoolYear = record.schoolYear || '2026-2027';
       await client.query(
-        `INSERT INTO attendance (student_id, month, present_days, absent_days, tardy_days)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (student_id, month) DO UPDATE SET
+        `INSERT INTO attendance (student_id, month, present_days, absent_days, tardy_days, school_year)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (student_id, month, school_year) DO UPDATE SET
          present_days = $3, absent_days = $4, tardy_days = $5`,
-        [record.studentId, record.month, record.presentDays, record.absentDays, record.tardyDays]
+        [record.studentId, record.month, record.presentDays, record.absentDays, record.tardyDays, schoolYear]
       );
     }
     

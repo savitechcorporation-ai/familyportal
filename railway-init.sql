@@ -32,23 +32,26 @@ CREATE TABLE IF NOT EXISTS students (
 );
 
 CREATE TABLE IF NOT EXISTS grades (
-  id         SERIAL PRIMARY KEY,
-  student_id INTEGER NOT NULL REFERENCES students(id),
-  subject    TEXT NOT NULL,
-  q1         NUMERIC,
-  q2         NUMERIC,
-  q3         NUMERIC,
-  q4         NUMERIC
+  id          SERIAL PRIMARY KEY,
+  student_id  INTEGER NOT NULL REFERENCES students(id),
+  subject     TEXT NOT NULL,
+  school_year TEXT NOT NULL DEFAULT '2026-2027',
+  q1          NUMERIC,
+  q2          NUMERIC,
+  q3          NUMERIC,
+  q4          NUMERIC,
+  UNIQUE (student_id, subject, school_year)
 );
 
 CREATE TABLE IF NOT EXISTS attendance (
   id           SERIAL PRIMARY KEY,
   student_id   INTEGER NOT NULL REFERENCES students(id),
   month        TEXT NOT NULL,
+  school_year  TEXT NOT NULL DEFAULT '2026-2027',
   present_days INTEGER,
   absent_days  INTEGER,
   tardy_days   INTEGER,
-  UNIQUE (student_id, month)
+  UNIQUE (student_id, month, school_year)
 );
 
 CREATE TABLE IF NOT EXISTS announcements (

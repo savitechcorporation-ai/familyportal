@@ -3,60 +3,113 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BCMA Grades Portal - Parent</title>
+  <title>FamilyPortal - Parent</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #FAF6EE; }
 
     .container { display: flex; height: 100vh; }
 
     /* Sidebar */
     .sidebar {
       width: 280px;
-      background: linear-gradient(180deg, #0B1F3A 0%, #1a3a52 100%);
+      background: #6B1E2E;
       color: white;
-      padding: 25px;
+      padding: 25px 20px;
+      display: flex;
+      flex-direction: column;
       overflow-y: auto;
     }
 
-    .sidebar h2 {
-      font-size: 18px;
-      margin-bottom: 30px;
-      color: #00B4A6;
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
+    .brand .logo {
+      width: 36px; height: 36px;
+      background: #C9A227;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; color: #6B1E2E; font-size: 16px;
+      flex-shrink: 0;
+    }
+    .brand .names { line-height: 1.3; }
+    .brand .names .app-name { font-weight: 700; font-size: 15px; }
+    .brand .names .school-name { font-size: 12px; color: #e8c9cd; }
+
+    .sidebar-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: #e8c9cd;
+      margin-bottom: 12px;
+      margin-top: 10px;
+      font-weight: 600;
     }
 
-    .child-list { list-style: none; margin-bottom: 20px; }
-    .child-list li { margin-bottom: 10px; }
+    .child-list { list-style: none; margin-bottom: 15px; }
+    .child-list li { margin-bottom: 8px; }
 
-    .child-list button {
+    .child-card {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: white;
+      padding: 10px 12px;
+      text-align: left;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .child-card .child-name { font-weight: 600; margin-bottom: 2px; }
+    .child-card .child-meta { font-size: 11px; color: #e8c9cd; }
+
+    .child-card:hover { background: rgba(255,255,255,0.12); }
+
+    .child-card.active {
+      background: #C9A227;
+      border-color: #C9A227;
+      color: #3a1420;
+    }
+    .child-card.active .child-meta { color: #5a2a35; }
+
+    .nav-list { list-style: none; margin-top: 15px; margin-bottom: auto; }
+    .nav-list li { margin-bottom: 6px; }
+
+    .nav-btn {
       width: 100%;
       background: none;
       border: none;
-      color: #a8c0d6;
+      color: #e8c9cd;
       padding: 12px 15px;
       text-align: left;
-      border-radius: 6px;
+      border-radius: 999px;
       cursor: pointer;
       font-size: 14px;
-      transition: all 0.3s;
+      font-weight: 500;
+      transition: all 0.2s;
     }
 
-    .child-list button:hover {
-      background: rgba(255,255,255,0.1);
-      color: white;
+    .nav-btn:hover { background: rgba(255,255,255,0.08); color: white; }
+
+    .nav-btn.active {
+      background: #C9A227;
+      color: #3a1420;
+      font-weight: 700;
     }
 
-    .child-list button.active {
-      background: #00B4A6;
-      color: white;
+    .sidebar-footer {
+      border-top: 1px solid rgba(255,255,255,0.15);
+      padding-top: 15px;
+      margin-top: 15px;
     }
+
+    .parent-info { font-size: 12px; color: #e8c9cd; margin-bottom: 10px; line-height: 1.4; }
+    .parent-info .parent-name { color: white; font-weight: 600; font-size: 13px; }
 
     .logout-btn {
-      margin-top: auto;
       width: 100%;
       background: rgba(255,255,255,0.1);
       border: none;
-      color: #e8c9cd;
+      color: white;
       padding: 10px;
       border-radius: 6px;
       cursor: pointer;
@@ -70,23 +123,140 @@
       flex: 1;
       display: flex;
       flex-direction: column;
+      overflow-y: auto;
     }
-
-    .topbar {
-      background: white;
-      padding: 20px 30px;
-      border-bottom: 1px solid #eee;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .topbar h1 { font-size: 22px; color: #0B1F3A; }
 
     .content {
       flex: 1;
-      padding: 30px;
-      overflow-y: auto;
+      padding: 40px 45px;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 30px;
+    }
+
+    .page-header h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      color: #6B1E2E;
+      font-size: 30px;
+      margin-bottom: 6px;
+    }
+
+    .page-header .subtitle { color: #7a7a7a; font-size: 14px; }
+
+    .year-pill {
+      background: white;
+      border: 1px solid #e5ddd0;
+      color: #6B1E2E;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border: 1px solid #efe8da;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(107, 30, 46, 0.05);
+    }
+
+    .card h3 {
+      color: #6B1E2E;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+
+    .cards-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 700;
+      color: #6B1E2E;
+      margin-bottom: 8px;
+    }
+
+    /* Status pills */
+    .pill {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .pill-outstanding { background: #d9f2ea; color: #0d8a63; }
+    .pill-satisfactory { background: #fbeecb; color: #96720f; }
+    .pill-attention { background: #fbe1e1; color: #b03434; }
+    .pill-ungraded { background: #eee; color: #888; }
+
+    .honor-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #C9A227 0%, #e0bb3d 100%);
+      color: #4a3403;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 10px;
+    }
+
+    .subject-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f2ede1;
+      font-size: 13px;
+    }
+
+    .subject-row:last-child { border-bottom: none; }
+    .subject-row .subject-name { color: #333; font-weight: 500; }
+    .subject-row .subject-grade { color: #6B1E2E; font-weight: 700; margin-right: 12px; }
+
+    .attendance-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      text-align: center;
+    }
+
+    .attendance-stat { padding: 10px; }
+    .attendance-stat .num { font-size: 26px; font-weight: 700; color: #6B1E2E; }
+    .attendance-stat .label { font-size: 12px; color: #888; margin-top: 4px; }
+
+    .announcement {
+      padding: 14px 0;
+      border-bottom: 1px solid #f2ede1;
+    }
+    .announcement:last-child { border-bottom: none; }
+    .announcement h4 { color: #6B1E2E; font-size: 14px; margin-bottom: 4px; }
+    .announcement .date { color: #999; font-size: 11px; margin-bottom: 6px; }
+    .announcement p { color: #555; font-size: 13px; line-height: 1.5; }
+
+    .empty-msg { color: #999; font-size: 13px; padding: 10px 0; }
+
+    .placeholder-card {
+      background: white;
+      border: 1px dashed #d8cfbc;
+      border-radius: 12px;
+      padding: 60px 30px;
+      text-align: center;
+      color: #999;
+      font-size: 14px;
     }
 
     /* Login Screen */
@@ -95,37 +265,32 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
-      background: linear-gradient(135deg, #0B1F3A 0%, #1a3a52 100%);
+      background: linear-gradient(135deg, #6B1E2E 0%, #3a1420 100%);
     }
 
     .login-box {
       background: white;
       padding: 40px;
       border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
       width: 100%;
       max-width: 400px;
     }
 
     .login-box h1 {
-      color: #0B1F3A;
+      font-family: Georgia, 'Times New Roman', serif;
+      color: #6B1E2E;
       margin-bottom: 10px;
       font-size: 28px;
     }
 
-    .login-box p {
-      color: #666;
-      margin-bottom: 30px;
-      font-size: 14px;
-    }
+    .login-box p { color: #666; margin-bottom: 30px; font-size: 14px; }
 
-    .form-group {
-      margin-bottom: 20px;
-    }
+    .form-group { margin-bottom: 20px; }
 
     .form-group label {
       display: block;
-      color: #0B1F3A;
+      color: #6B1E2E;
       font-weight: 600;
       margin-bottom: 8px;
       font-size: 13px;
@@ -141,14 +306,14 @@
 
     .form-group input:focus {
       outline: none;
-      border-color: #00B4A6;
-      box-shadow: 0 0 0 3px rgba(0, 180, 166, 0.1);
+      border-color: #C9A227;
+      box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
     }
 
     .btn-login {
       width: 100%;
       padding: 12px;
-      background: linear-gradient(135deg, #0B1F3A 0%, #00B4A6 100%);
+      background: linear-gradient(135deg, #6B1E2E 0%, #C9A227 100%);
       color: white;
       border: none;
       border-radius: 6px;
@@ -160,63 +325,14 @@
     .btn-login:hover { transform: translateY(-2px); }
 
     .error-msg {
-      color: #e74c3c;
+      color: #b03434;
       font-size: 13px;
       margin-top: 15px;
       padding: 10px;
-      background: #ffe6e6;
+      background: #fbe1e1;
       border-radius: 4px;
       display: none;
     }
-
-    /* Content cards */
-    .card {
-      background: white;
-      padding: 25px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    .card h3 {
-      color: #0B1F3A;
-      margin-bottom: 15px;
-      font-size: 16px;
-    }
-
-    .table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .table th {
-      background: #f5f5f5;
-      padding: 12px;
-      text-align: left;
-      font-weight: 600;
-      color: #0B1F3A;
-      border-bottom: 1px solid #ddd;
-      font-size: 13px;
-    }
-
-    .table td {
-      padding: 10px 12px;
-      border-bottom: 1px solid #eee;
-      font-size: 13px;
-    }
-
-    .announcement {
-      padding: 15px 0;
-      border-bottom: 1px solid #eee;
-    }
-
-    .announcement:last-child { border-bottom: none; }
-
-    .announcement h4 { color: #0B1F3A; font-size: 14px; margin-bottom: 5px; }
-    .announcement .date { color: #999; font-size: 12px; margin-bottom: 8px; }
-    .announcement p { color: #444; font-size: 13px; line-height: 1.5; }
-
-    .empty-msg { color: #999; font-size: 13px; padding: 10px 0; }
 
     .hidden { display: none !important; }
   </style>
@@ -226,7 +342,7 @@
 <!-- LOGIN SCREEN -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <h1>BCMA Grades Portal</h1>
+    <h1>FamilyPortal</h1>
     <p>View your child's grades, attendance, and announcements</p>
 
     <div class="form-group">
@@ -253,55 +369,98 @@
 <!-- PARENT PORTAL -->
 <div id="portalScreen" class="container" style="display: none;">
   <div class="sidebar">
-    <h2>BCMA Grades Portal</h2>
+    <div class="brand">
+      <div class="logo">FP</div>
+      <div class="names">
+        <div class="app-name">FamilyPortal</div>
+        <div class="school-name" id="schoolNameLabel"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-label">MY CHILDREN</div>
     <ul class="child-list" id="childList"></ul>
-    <button class="logout-btn" onclick="handleLogout()">🚪 Sign Out</button>
+
+    <ul class="nav-list" id="navList">
+      <li><button class="nav-btn active" data-page="overview">Overview</button></li>
+      <li><button class="nav-btn" data-page="grades">Grades</button></li>
+      <li><button class="nav-btn" data-page="reportcards">Report Cards</button></li>
+      <li><button class="nav-btn" data-page="attendance">Attendance &amp; Honors</button></li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="parent-info">
+        <div class="parent-name" id="parentNameLabel"></div>
+        <div id="parentEmailLabel"></div>
+      </div>
+      <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
+    </div>
   </div>
 
   <div class="main">
-    <div class="topbar">
-      <h1 id="sectionTitle">Select a Child</h1>
-      <div id="userInfo" style="text-align: right; font-size: 13px; color: #666;"></div>
-    </div>
-
     <div class="content">
-      <div class="card">
-        <h3>Grades</h3>
-        <table class="table" id="gradesTable">
-          <thead>
-            <tr>
-              <th>Subject</th>
-              <th>Q1</th>
-              <th>Q2</th>
-              <th>Q3</th>
-              <th>Q4</th>
-            </tr>
-          </thead>
-          <tbody id="gradesList"></tbody>
-        </table>
-        <div class="empty-msg hidden" id="gradesEmpty">No grades recorded yet.</div>
+      <div class="page-header">
+        <div>
+          <h1 id="pageTitle">Overview</h1>
+          <div class="subtitle" id="pageSubtitle">A quick summary of your child's performance</div>
+        </div>
+        <div class="year-pill">S.Y. 2026-2027</div>
       </div>
 
-      <div class="card">
-        <h3>Attendance</h3>
-        <table class="table" id="attendanceTable">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Present</th>
-              <th>Absent</th>
-              <th>Tardy</th>
-            </tr>
-          </thead>
-          <tbody id="attendanceList"></tbody>
-        </table>
-        <div class="empty-msg hidden" id="attendanceEmpty">No attendance recorded yet.</div>
+      <!-- OVERVIEW PAGE -->
+      <div id="overviewPage" class="page">
+        <div class="cards-row">
+          <div class="card">
+            <h3>General Average</h3>
+            <div class="stat-value" id="generalAverage">--</div>
+            <span class="pill pill-ungraded" id="generalAveragePill">Ungraded</span>
+            <div id="honorBadge"></div>
+          </div>
+
+          <div class="card">
+            <h3>Attendance Summary</h3>
+            <div class="attendance-grid">
+              <div class="attendance-stat">
+                <div class="num" id="attendancePresent">--</div>
+                <div class="label">Present</div>
+              </div>
+              <div class="attendance-stat">
+                <div class="num" id="attendanceAbsent">--</div>
+                <div class="label">Absent</div>
+              </div>
+              <div class="attendance-stat">
+                <div class="num" id="attendanceTardy">--</div>
+                <div class="label">Tardy</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Subjects at a Glance</h3>
+          <div id="subjectsList"></div>
+          <div class="empty-msg hidden" id="subjectsEmpty">No grades recorded yet.</div>
+        </div>
+
+        <div class="card">
+          <h3>Announcements</h3>
+          <div id="announcementsList"></div>
+          <div class="empty-msg hidden" id="announcementsEmpty">No announcements yet.</div>
+        </div>
       </div>
 
-      <div class="card">
-        <h3>Announcements</h3>
-        <div id="announcementsList"></div>
-        <div class="empty-msg hidden" id="announcementsEmpty">No announcements yet.</div>
+      <!-- GRADES PAGE (placeholder) -->
+      <div id="gradesPage" class="page hidden">
+        <div class="placeholder-card">Grades page coming soon.</div>
+      </div>
+
+      <!-- REPORT CARDS PAGE (placeholder) -->
+      <div id="reportcardsPage" class="page hidden">
+        <div class="placeholder-card">Report Cards page coming soon.</div>
+      </div>
+
+      <!-- ATTENDANCE & HONORS PAGE (placeholder) -->
+      <div id="attendancePage" class="page hidden">
+        <div class="placeholder-card">Attendance &amp; Honors page coming soon.</div>
       </div>
     </div>
   </div>
@@ -309,22 +468,42 @@
 
 <script>
   const API_BASE = 'https://familyportal.onrender.com/api';
+  const SCHOOL_YEAR = '2026-2027';
+
   let authToken = null;
   let currentSchoolId = null;
   let children = [];
   let activeStudentId = null;
+  let activePage = 'overview';
+
+  const PAGE_TITLES = {
+    overview: { title: 'Overview', subtitle: "A quick summary of your child's performance" },
+    grades: { title: 'Grades', subtitle: 'Quarterly grades by subject' },
+    reportcards: { title: 'Report Cards', subtitle: 'Official report card records' },
+    attendance: { title: 'Attendance & Honors', subtitle: 'Attendance record and honor roll status' }
+  };
 
   window.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.year-pill').forEach(el => {
+      el.textContent = `S.Y. ${SCHOOL_YEAR}`;
+    });
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchPage(btn.dataset.page, btn));
+    });
+
     const savedToken = localStorage.getItem('parentToken');
     const savedChildren = localStorage.getItem('parentChildren');
     const savedSchoolId = localStorage.getItem('parentSchoolId');
-    const savedUserInfo = localStorage.getItem('parentUserInfo');
+    const savedName = localStorage.getItem('parentName');
+    const savedEmail = localStorage.getItem('parentEmail');
+    const savedSchoolName = localStorage.getItem('parentSchoolName');
 
     if (savedToken && savedChildren) {
       authToken = savedToken;
       children = JSON.parse(savedChildren);
       currentSchoolId = savedSchoolId ? parseInt(savedSchoolId) : null;
-      showPortal(savedUserInfo || '');
+      showPortal(savedName || '', savedEmail || '', savedSchoolName || '');
     }
   });
 
@@ -359,14 +538,15 @@
       authToken = data.token;
       children = data.students || [];
       currentSchoolId = data.user.school_id;
-      const userInfo = `${data.user.name} (${data.user.school_name})`;
 
       localStorage.setItem('parentToken', data.token);
       localStorage.setItem('parentChildren', JSON.stringify(children));
       localStorage.setItem('parentSchoolId', String(currentSchoolId));
-      localStorage.setItem('parentUserInfo', userInfo);
+      localStorage.setItem('parentName', data.user.name);
+      localStorage.setItem('parentEmail', data.user.email);
+      localStorage.setItem('parentSchoolName', data.user.school_name);
 
-      showPortal(userInfo);
+      showPortal(data.user.name, data.user.email, data.user.school_name);
 
     } catch (error) {
       errorDiv.textContent = 'Connection error: ' + error.message;
@@ -374,97 +554,183 @@
     }
   }
 
-  function showPortal(userInfo) {
+  function showPortal(parentName, parentEmail, schoolName) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('portalScreen').style.display = 'flex';
-    document.getElementById('userInfo').textContent = userInfo;
+    document.getElementById('parentNameLabel').textContent = parentName;
+    document.getElementById('parentEmailLabel').textContent = parentEmail;
+    document.getElementById('schoolNameLabel').textContent = schoolName;
 
     const childList = document.getElementById('childList');
     childList.innerHTML = children.map(child => `
-      <li><button class="child-btn" data-id="${child.id}">${child.name}</button></li>
+      <li>
+        <button class="child-card" data-id="${child.id}">
+          <div class="child-name">${child.name}</div>
+          <div class="child-meta">${child.grade_level || ''}${child.section ? ' - ' + child.section : ''}</div>
+        </button>
+      </li>
     `).join('');
 
-    document.querySelectorAll('.child-btn').forEach(btn => {
+    document.querySelectorAll('.child-card').forEach(btn => {
       btn.addEventListener('click', () => selectChild(parseInt(btn.dataset.id), btn));
     });
 
-    loadAnnouncements();
-
     if (children.length > 0) {
-      selectChild(children[0].id, document.querySelector('.child-btn'));
+      selectChild(children[0].id, document.querySelector('.child-card'));
     }
   }
 
   function selectChild(studentId, btnEl) {
     activeStudentId = studentId;
 
-    document.querySelectorAll('.child-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.child-card').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
 
-    const child = children.find(c => c.id === studentId);
-    document.getElementById('sectionTitle').textContent = child ? child.name : 'Select a Child';
-
-    loadGrades(studentId);
-    loadAttendance(studentId);
+    renderActivePage();
   }
 
-  async function loadGrades(studentId) {
+  function switchPage(page, btnEl) {
+    activePage = page;
+
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+
+    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+    document.getElementById(`${page}Page`).classList.remove('hidden');
+
+    document.getElementById('pageTitle').textContent = PAGE_TITLES[page].title;
+    document.getElementById('pageSubtitle').textContent = PAGE_TITLES[page].subtitle;
+
+    renderActivePage();
+  }
+
+  function renderActivePage() {
+    if (!activeStudentId) return;
+
+    if (activePage === 'overview') {
+      loadOverview(activeStudentId);
+    }
+  }
+
+  function pillInfo(value) {
+    if (value === null || value === undefined || value === '') {
+      return { className: 'pill-ungraded', label: 'Ungraded' };
+    }
+    const num = parseFloat(value);
+    if (num >= 90) return { className: 'pill-outstanding', label: 'Outstanding' };
+    if (num >= 85) return { className: 'pill-satisfactory', label: 'Satisfactory' };
+    return { className: 'pill-attention', label: 'Needs Attention' };
+  }
+
+  function statusPill(value) {
+    const info = pillInfo(value);
+    return `<span class="pill ${info.className}">${info.label}</span>`;
+  }
+
+  function setPill(el, value) {
+    const info = pillInfo(value);
+    el.className = `pill ${info.className}`;
+    el.textContent = info.label;
+  }
+
+  function honorBadge(average) {
+    if (average === null) return '';
+    if (average >= 98) return '<div class="honor-badge">🏅 With Highest Honors</div>';
+    if (average >= 95) return '<div class="honor-badge">🏅 With High Honors</div>';
+    if (average >= 90) return '<div class="honor-badge">🏅 With Honors</div>';
+    return '';
+  }
+
+  async function loadOverview(studentId) {
+    await Promise.all([
+      loadGradesSummary(studentId),
+      loadAttendanceSummary(studentId),
+      loadAnnouncements()
+    ]);
+  }
+
+  async function loadGradesSummary(studentId) {
     try {
-      const response = await fetch(`${API_BASE}/grades/${studentId}`, {
+      const response = await fetch(`${API_BASE}/grades/${studentId}?schoolYear=${SCHOOL_YEAR}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
 
-      const tbody = document.getElementById('gradesList');
-      const empty = document.getElementById('gradesEmpty');
+      const subjectsList = document.getElementById('subjectsList');
+      const subjectsEmpty = document.getElementById('subjectsEmpty');
+      const avgEl = document.getElementById('generalAverage');
+      const avgPillEl = document.getElementById('generalAveragePill');
+      const honorEl = document.getElementById('honorBadge');
 
       if (!response.ok || data.length === 0) {
-        tbody.innerHTML = '';
-        empty.classList.remove('hidden');
+        subjectsList.innerHTML = '';
+        subjectsEmpty.classList.remove('hidden');
+        avgEl.textContent = '--';
+        setPill(avgPillEl, null);
+        honorEl.innerHTML = '';
         return;
       }
 
-      empty.classList.add('hidden');
-      tbody.innerHTML = data.map(g => `
-        <tr>
-          <td>${g.subject}</td>
-          <td>${g.q1 ?? ''}</td>
-          <td>${g.q2 ?? ''}</td>
-          <td>${g.q3 ?? ''}</td>
-          <td>${g.q4 ?? ''}</td>
-        </tr>
+      subjectsEmpty.classList.add('hidden');
+
+      // Latest available quarter grade per subject (q4 -> q1 fallback)
+      const latestGrades = data.map(g => {
+        const latest = [g.q4, g.q3, g.q2, g.q1].find(v => v !== null && v !== undefined);
+        return { subject: g.subject, latest };
+      });
+
+      subjectsList.innerHTML = latestGrades.map(g => `
+        <div class="subject-row">
+          <span class="subject-name">${g.subject}</span>
+          <span>
+            <span class="subject-grade">${g.latest ?? '--'}</span>
+            ${statusPill(g.latest)}
+          </span>
+        </div>
       `).join('');
+
+      const gradedValues = latestGrades.filter(g => g.latest !== undefined).map(g => parseFloat(g.latest));
+      if (gradedValues.length > 0) {
+        const average = gradedValues.reduce((sum, v) => sum + v, 0) / gradedValues.length;
+        const rounded = Math.round(average * 100) / 100;
+        avgEl.textContent = rounded;
+        setPill(avgPillEl, rounded);
+        honorEl.innerHTML = honorBadge(rounded);
+      } else {
+        avgEl.textContent = '--';
+        setPill(avgPillEl, null);
+        honorEl.innerHTML = '';
+      }
 
     } catch (error) {
       console.error('Failed to load grades:', error.message);
     }
   }
 
-  async function loadAttendance(studentId) {
+  async function loadAttendanceSummary(studentId) {
     try {
-      const response = await fetch(`${API_BASE}/attendance/${studentId}`, {
+      const response = await fetch(`${API_BASE}/attendance/${studentId}?schoolYear=${SCHOOL_YEAR}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
 
-      const tbody = document.getElementById('attendanceList');
-      const empty = document.getElementById('attendanceEmpty');
-
-      if (!response.ok || data.length === 0) {
-        tbody.innerHTML = '';
-        empty.classList.remove('hidden');
+      if (!response.ok) {
+        document.getElementById('attendancePresent').textContent = '--';
+        document.getElementById('attendanceAbsent').textContent = '--';
+        document.getElementById('attendanceTardy').textContent = '--';
         return;
       }
 
-      empty.classList.add('hidden');
-      tbody.innerHTML = data.map(a => `
-        <tr>
-          <td>${a.month}</td>
-          <td>${a.present_days ?? ''}</td>
-          <td>${a.absent_days ?? ''}</td>
-          <td>${a.tardy_days ?? ''}</td>
-        </tr>
-      `).join('');
+      const totals = data.reduce((acc, a) => {
+        acc.present += a.present_days || 0;
+        acc.absent += a.absent_days || 0;
+        acc.tardy += a.tardy_days || 0;
+        return acc;
+      }, { present: 0, absent: 0, tardy: 0 });
+
+      document.getElementById('attendancePresent').textContent = totals.present;
+      document.getElementById('attendanceAbsent').textContent = totals.absent;
+      document.getElementById('attendanceTardy').textContent = totals.tardy;
 
     } catch (error) {
       console.error('Failed to load attendance:', error.message);
@@ -488,7 +754,7 @@
       }
 
       empty.classList.add('hidden');
-      list.innerHTML = data.map(a => `
+      list.innerHTML = data.slice(0, 5).map(a => `
         <div class="announcement">
           <h4>${a.title}</h4>
           <div class="date">${new Date(a.date).toLocaleDateString()}</div>
@@ -510,7 +776,9 @@
     localStorage.removeItem('parentToken');
     localStorage.removeItem('parentChildren');
     localStorage.removeItem('parentSchoolId');
-    localStorage.removeItem('parentUserInfo');
+    localStorage.removeItem('parentName');
+    localStorage.removeItem('parentEmail');
+    localStorage.removeItem('parentSchoolName');
     document.getElementById('portalScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('parentEmail').value = '';
