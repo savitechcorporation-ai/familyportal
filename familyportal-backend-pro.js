@@ -206,17 +206,21 @@ app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
   const { studentId } = req.params;
   
   try {
-    // Verify student belongs to user's school
+    // Verify student belongs to user's school (and to this parent, if requester is a parent)
     const studentCheck = await client.query(
-      `SELECT id FROM students 
+      `SELECT id, parent_id FROM students
        WHERE id = $1 AND school_id = $2`,
       [studentId, req.user.schoolId]
     );
-    
+
     if (studentCheck.rows.length === 0) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
+    if (req.user.role === 'parent' && studentCheck.rows[0].parent_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const grades = await client.query(
       `SELECT subject, q1, q2, q3, q4
        FROM grades
@@ -224,9 +228,9 @@ app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
        ORDER BY subject ASC`,
       [studentId]
     );
-    
+
     res.json(grades.rows);
-    
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -235,8 +239,23 @@ app.get('/api/grades/:studentId', verifyToken, async (req, res) => {
 // 4. GET STUDENT ATTENDANCE
 app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
   const { studentId } = req.params;
-  
+
   try {
+    // Verify student belongs to user's school (and to this parent, if requester is a parent)
+    const studentCheck = await client.query(
+      `SELECT id, parent_id FROM students
+       WHERE id = $1 AND school_id = $2`,
+      [studentId, req.user.schoolId]
+    );
+
+    if (studentCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (req.user.role === 'parent' && studentCheck.rows[0].parent_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const attendance = await client.query(
       `SELECT month, present_days, absent_days, tardy_days
        FROM attendance
@@ -244,9 +263,9 @@ app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
        ORDER BY month DESC`,
       [studentId]
     );
-    
+
     res.json(attendance.rows);
-    
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -255,7 +274,11 @@ app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
 // 5. GET ANNOUNCEMENTS
 app.get('/api/announcements/:schoolId', verifyToken, async (req, res) => {
   const { schoolId } = req.params;
-  
+
+  if (parseInt(schoolId) !== req.user.schoolId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
   try {
     const announcements = await client.query(
       `SELECT id, title, message, date
@@ -264,9 +287,9 @@ app.get('/api/announcements/:schoolId', verifyToken, async (req, res) => {
        ORDER BY date DESC`,
       [schoolId]
     );
-    
+
     res.json(announcements.rows);
-    
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -274,7 +297,30 @@ app.get('/api/announcements/:schoolId', verifyToken, async (req, res) => {
 
 // ==================== ADMIN ENDPOINTS ====================
 
-// 6. ADD STUDENT (Admin only)
+// 6. LIST STUDENTS (Admin only)
+app.get('/api/admin/students', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const students = await client.query(
+      `SELECT s.id, s.name, s.grade_level, s.section, u.email AS parent_email
+       FROM students s
+       JOIN users u ON s.parent_id = u.id
+       WHERE s.school_id = $1
+       ORDER BY s.name ASC`,
+      [req.user.schoolId]
+    );
+
+    res.json(students.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. ADD STUDENT (Admin only)
 app.post('/api/admin/students', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -322,7 +368,7 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
   }
 });
 
-// 7. ADD GRADES (Admin only)
+// 8. ADD GRADES (Admin only)
 app.post('/api/admin/grades', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -367,7 +413,7 @@ app.post('/api/admin/grades', verifyToken, async (req, res) => {
   }
 });
 
-// 8. ADD ANNOUNCEMENT (Admin only)
+// 9. ADD ANNOUNCEMENT (Admin only)
 app.post('/api/admin/announcements', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -396,7 +442,7 @@ app.post('/api/admin/announcements', verifyToken, async (req, res) => {
 
 // ==================== CHECKED ATTENDANCE INTEGRATION ====================
 
-// 9. SYNC ATTENDANCE FROM CHECKED
+// 10. SYNC ATTENDANCE FROM CHECKED
 app.post('/api/sync-checked-attendance', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -440,7 +486,7 @@ app.post('/api/sync-checked-attendance', verifyToken, async (req, res) => {
   }
 });
 
-// 10. BULK SYNC FROM CHECKED (For multiple students)
+// 11. BULK SYNC FROM CHECKED (For multiple students)
 app.post('/api/sync-checked-bulk', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -496,6 +542,7 @@ Portal (requires token):
   GET    /api/announcements/:schoolId - Get announcements
 
 Admin Only (requires token):
+  GET    /api/admin/students       - List students
   POST   /api/admin/students       - Add student
   POST   /api/admin/grades         - Add/update grades
   POST   /api/admin/announcements  - Create announcement

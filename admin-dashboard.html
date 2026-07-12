@@ -574,8 +574,32 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // Load students
   async function loadStudents() {
-    // This is a placeholder - you'll need to create an endpoint to list students
-    console.log('Students loaded');
+    try {
+      const response = await fetch(`${API_BASE}/admin/students`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to load students:', data.error);
+        return;
+      }
+
+      const tbody = document.getElementById('studentsList');
+      tbody.innerHTML = data.map(student => `
+        <tr>
+          <td>${student.name}</td>
+          <td>${student.grade_level || ''}</td>
+          <td>${student.section || ''}</td>
+          <td>${student.parent_email}</td>
+          <td>${student.id}</td>
+        </tr>
+      `).join('');
+
+    } catch (error) {
+      console.error('Failed to load students:', error.message);
+    }
   }
   
   // Add Student
@@ -613,6 +637,7 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('studentName').value = '';
         document.getElementById('gradeLevel').value = '';
         document.getElementById('section').value = '';
+        loadStudents();
       } else {
         alert('Error: ' + data.error);
       }
