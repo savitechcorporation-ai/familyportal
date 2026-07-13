@@ -6,12 +6,20 @@
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS schools (
-  id         SERIAL PRIMARY KEY,
-  name       TEXT NOT NULL,
-  address    TEXT,
-  director   TEXT,
-  registrar  TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  id                  SERIAL PRIMARY KEY,
+  name                TEXT NOT NULL,
+  address             TEXT,
+  director            TEXT,
+  registrar           TEXT,
+  logo                BYTEA,
+  logo_content_type   TEXT,
+  banner              BYTEA,
+  banner_content_type TEXT,
+  primary_color       TEXT,
+  accent_color        TEXT,
+  display_name        TEXT,
+  branding_updated_at TIMESTAMP,
+  created_at          TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- No UNIQUE(school_id, email): each child gets a fully separate login row,

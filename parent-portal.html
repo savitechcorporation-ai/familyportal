@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FamilyPortal - Parent</title>
   <style>
+    :root {
+      --maroon: #6B1E2E;
+      --maroon-dark: #3a1420;
+      --maroon-muted: #5a2a35;
+      --gold: #C9A227;
+      --gold-dark: #4a3403;
+      --gold-tint: #e0bb3d;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #FAF6EE; }
 
@@ -13,7 +21,7 @@
     /* Sidebar */
     .sidebar {
       width: 280px;
-      background: #6B1E2E;
+      background: var(--maroon);
       color: white;
       padding: 25px 20px;
       display: flex;
@@ -24,11 +32,22 @@
     .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
     .brand .logo {
       width: 36px; height: 36px;
-      background: #C9A227;
+      background: var(--gold);
       border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: #6B1E2E; font-size: 16px;
+      font-weight: 700; color: var(--maroon); font-size: 16px;
       flex-shrink: 0;
+      position: relative; overflow: hidden;
+    }
+    .brand .logo img, .login-logo img {
+      width: 100%; height: 100%; object-fit: cover; border-radius: inherit;
+    }
+    .login-logo {
+      width: 52px; height: 52px; margin: 0 auto 16px;
+      background: var(--gold); border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; color: var(--maroon); font-size: 22px;
+      position: relative; overflow: hidden;
     }
     .brand .names { line-height: 1.3; }
     .brand .names .app-name { font-weight: 700; font-size: 15px; }
@@ -65,11 +84,11 @@
     .child-card:hover { background: rgba(255,255,255,0.12); }
 
     .child-card.active {
-      background: #C9A227;
-      border-color: #C9A227;
-      color: #3a1420;
+      background: var(--gold);
+      border-color: var(--gold);
+      color: var(--maroon-dark);
     }
-    .child-card.active .child-meta { color: #5a2a35; }
+    .child-card.active .child-meta { color: var(--maroon-muted); }
 
     .nav-list { list-style: none; margin-top: 15px; margin-bottom: auto; }
     .nav-list li { margin-bottom: 6px; }
@@ -91,8 +110,8 @@
     .nav-btn:hover { background: rgba(255,255,255,0.08); color: white; }
 
     .nav-btn.active {
-      background: #C9A227;
-      color: #3a1420;
+      background: var(--gold);
+      color: var(--maroon-dark);
       font-weight: 700;
     }
 
@@ -140,7 +159,7 @@
 
     .page-header h1 {
       font-family: Georgia, 'Times New Roman', serif;
-      color: #6B1E2E;
+      color: var(--maroon);
       font-size: 30px;
       margin-bottom: 6px;
     }
@@ -150,7 +169,7 @@
     .year-pill {
       background: white;
       border: 1px solid #e5ddd0;
-      color: #6B1E2E;
+      color: var(--maroon);
       padding: 8px 16px;
       border-radius: 999px;
       font-size: 13px;
@@ -169,7 +188,7 @@
     }
 
     .card h3 {
-      color: #6B1E2E;
+      color: var(--maroon);
       font-size: 16px;
       margin-bottom: 15px;
     }
@@ -183,7 +202,7 @@
     .stat-value {
       font-size: 34px;
       font-weight: 700;
-      color: #6B1E2E;
+      color: var(--maroon);
       margin-bottom: 8px;
     }
 
@@ -205,8 +224,8 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: linear-gradient(135deg, #C9A227 0%, #e0bb3d 100%);
-      color: #4a3403;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-tint) 100%);
+      color: var(--gold-dark);
       padding: 8px 16px;
       border-radius: 999px;
       font-size: 13px;
@@ -225,7 +244,7 @@
 
     .subject-row:last-child { border-bottom: none; }
     .subject-row .subject-name { color: #333; font-weight: 500; }
-    .subject-row .subject-grade { color: #6B1E2E; font-weight: 700; margin-right: 12px; }
+    .subject-row .subject-grade { color: var(--maroon); font-weight: 700; margin-right: 12px; }
 
     .attendance-grid {
       display: grid;
@@ -235,7 +254,7 @@
     }
 
     .attendance-stat { padding: 10px; }
-    .attendance-stat .num { font-size: 26px; font-weight: 700; color: #6B1E2E; }
+    .attendance-stat .num { font-size: 26px; font-weight: 700; color: var(--maroon); }
     .attendance-stat .label { font-size: 12px; color: #888; margin-top: 4px; }
 
     .announcement {
@@ -243,7 +262,7 @@
       border-bottom: 1px solid #f2ede1;
     }
     .announcement:last-child { border-bottom: none; }
-    .announcement h4 { color: #6B1E2E; font-size: 14px; margin-bottom: 4px; }
+    .announcement h4 { color: var(--maroon); font-size: 14px; margin-bottom: 4px; }
     .announcement .date { color: #999; font-size: 11px; margin-bottom: 6px; }
     .announcement p { color: #555; font-size: 13px; line-height: 1.5; }
 
@@ -265,7 +284,7 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
-      background: linear-gradient(135deg, #6B1E2E 0%, #3a1420 100%);
+      background: linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%);
     }
 
     .login-box {
@@ -279,7 +298,7 @@
 
     .login-box h1 {
       font-family: Georgia, 'Times New Roman', serif;
-      color: #6B1E2E;
+      color: var(--maroon);
       margin-bottom: 10px;
       font-size: 28px;
     }
@@ -290,7 +309,7 @@
 
     .form-group label {
       display: block;
-      color: #6B1E2E;
+      color: var(--maroon);
       font-weight: 600;
       margin-bottom: 8px;
       font-size: 13px;
@@ -306,14 +325,14 @@
 
     .form-group input:focus {
       outline: none;
-      border-color: #C9A227;
+      border-color: var(--gold);
       box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
     }
 
     .btn-login {
       width: 100%;
       padding: 12px;
-      background: linear-gradient(135deg, #6B1E2E 0%, #C9A227 100%);
+      background: linear-gradient(135deg, var(--maroon) 0%, var(--gold) 100%);
       color: white;
       border: none;
       border-radius: 6px;
@@ -342,7 +361,11 @@
 <!-- LOGIN SCREEN -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <h1>FamilyPortal</h1>
+    <div class="login-logo" id="loginLogoBox">
+      <span id="loginIconEmoji">🎓</span>
+      <img id="loginIconImg" class="hidden" alt="" />
+    </div>
+    <h1 id="loginTitle">FamilyPortal</h1>
     <p>View your child's grades, attendance, and announcements</p>
 
     <div class="form-group">
@@ -375,9 +398,12 @@
 <div id="portalScreen" class="container" style="display: none;">
   <div class="sidebar">
     <div class="brand">
-      <div class="logo">FP</div>
+      <div class="logo" id="brandLogoBox">
+        <span id="brandLogoEmoji">FP</span>
+        <img id="brandLogoImg" class="hidden" alt="" />
+      </div>
       <div class="names">
-        <div class="app-name">FamilyPortal</div>
+        <div class="app-name" id="brandName">FamilyPortal</div>
         <div class="school-name" id="schoolNameLabel"></div>
       </div>
     </div>
@@ -488,7 +514,108 @@
     attendance: { title: 'Attendance & Honors', subtitle: 'Attendance record and honor roll status' }
   };
 
+  // ---------- Branding (white-label) ----------
+  function hexToRgb(hex) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return null;
+    return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+  }
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  }
+  function darkenHex(hex, amount) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return hex;
+    return rgbToHex(rgb.r * (1 - amount), rgb.g * (1 - amount), rgb.b * (1 - amount));
+  }
+  function tintHex(hex, amount) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return hex;
+    return rgbToHex(rgb.r + (255 - rgb.r) * amount, rgb.g + (255 - rgb.g) * amount, rgb.b + (255 - rgb.b) * amount);
+  }
+  function hexToRgba(hex, alpha) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return `rgba(0,0,0,${alpha})`;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+  }
+
+  function applyColors(primaryColor, accentColor) {
+    if (primaryColor) {
+      document.documentElement.style.setProperty('--maroon', primaryColor);
+      document.documentElement.style.setProperty('--maroon-dark', darkenHex(primaryColor, 0.18));
+      document.documentElement.style.setProperty('--maroon-muted', darkenHex(primaryColor, 0.05));
+    }
+    if (accentColor) {
+      document.documentElement.style.setProperty('--gold', accentColor);
+      document.documentElement.style.setProperty('--gold-dark', darkenHex(accentColor, 0.55));
+      document.documentElement.style.setProperty('--gold-tint', tintHex(accentColor, 0.15));
+    }
+  }
+
+  function setLogoImage(url) {
+    ['brandLogoImg', 'loginIconImg'].forEach(imgId => {
+      const img = document.getElementById(imgId);
+      if (!img) return;
+      const emoji = document.getElementById(imgId.replace('Img', 'Emoji'));
+      img.onload = () => { img.classList.remove('hidden'); if (emoji) emoji.classList.add('hidden'); };
+      img.onerror = () => { img.classList.add('hidden'); if (emoji) emoji.classList.remove('hidden'); };
+      img.src = url;
+    });
+
+    let iconLink = document.querySelector('link[rel="icon"]');
+    if (!iconLink) {
+      iconLink = document.createElement('link');
+      iconLink.rel = 'icon';
+      document.head.appendChild(iconLink);
+    }
+    iconLink.href = url;
+  }
+
+  function setBannerBackground(url, scrimColor) {
+    const screen = document.getElementById('loginScreen');
+    if (!screen) return;
+    screen.style.backgroundImage =
+      `linear-gradient(${hexToRgba(scrimColor, 0.75)}, ${hexToRgba(darkenHex(scrimColor, 0.18), 0.85)}), url('${url}')`;
+    screen.style.backgroundSize = 'cover';
+    screen.style.backgroundPosition = 'center';
+  }
+
+  // Fetched before login (public endpoint) so the login screen itself is
+  // branded. Failures here fall back to this app's built-in defaults -
+  // branding is never allowed to block the rest of the app from working.
+  async function applyBranding() {
+    try {
+      const response = await fetch(`${API_BASE}/branding?schoolId=1`);
+      const data = await response.json();
+
+      if (data.display_name) {
+        document.title = data.display_name + ' - Parent';
+        const brandNameEl = document.getElementById('brandName');
+        if (brandNameEl) brandNameEl.textContent = data.display_name;
+        const loginTitleEl = document.getElementById('loginTitle');
+        if (loginTitleEl) loginTitleEl.textContent = data.display_name;
+      }
+
+      applyColors(data.primary_color, data.accent_color);
+
+      const v = data.updated_at ? new Date(data.updated_at).getTime() : Date.now();
+
+      if (data.hasLogo) {
+        setLogoImage(`${API_BASE}/branding/logo?schoolId=1&v=${v}`);
+      }
+
+      if (data.hasBanner) {
+        setBannerBackground(`${API_BASE}/branding/banner?schoolId=1&v=${v}`, data.primary_color || '#6B1E2E');
+      }
+
+    } catch (error) {
+      console.error('Failed to load branding (using defaults):', error.message);
+    }
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
+    applyBranding();
+
     document.querySelectorAll('.year-pill').forEach(el => {
       el.textContent = `S.Y. ${SCHOOL_YEAR}`;
     });

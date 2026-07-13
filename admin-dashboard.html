@@ -47,6 +47,10 @@
     .brand-logo {
       width: 38px; height: 38px; background: var(--gold); border-radius: 8px;
       display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+      position: relative; overflow: hidden;
+    }
+    .brand-logo img, .login-icon img {
+      width: 100%; height: 100%; object-fit: cover; border-radius: inherit;
     }
     .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: white; }
     .brand-subtitle { font-size: 9.5px; color: #d9b8bd; margin-top: 2px; }
@@ -408,6 +412,40 @@
       .settings-grid { grid-template-columns: 1fr; }
     }
 
+    /* School Branding */
+    .branding-preview-box {
+      width: 72px; height: 72px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 28px; overflow: hidden; position: relative;
+    }
+    .branding-preview-box img { width: 100%; height: 100%; object-fit: cover; }
+    .branding-banner-preview {
+      width: 100%; height: 80px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
+      color: var(--muted); font-size: 12px;
+    }
+    .branding-banner-preview img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+    .branding-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .reset-link { font-size: 12px; color: var(--maroon); text-decoration: underline; cursor: pointer; display: inline-block; margin-top: 10px; }
+    input[type="color"] { width: 60px; height: 36px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
+
+    .branding-mini-preview { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+    .mini-sidebar {
+      width: 170px; padding: 14px 12px; border-radius: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .mini-logo {
+      width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0; overflow: hidden;
+    }
+    .mini-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .mini-title { font-size: 11px; font-weight: 700; color: white; }
+    .mini-login {
+      width: 210px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);
+    }
+    .mini-login-header { padding: 18px 12px; text-align: center; background-size: cover; background-position: center; }
+    .mini-login-header .mini-logo { margin: 0 auto 6px; }
+    .mini-login-title { font-size: 11px; font-weight: 700; color: white; }
+    .mini-login-body { padding: 10px 12px; background: white; font-size: 9px; color: var(--muted); }
+
     .avatar-name { display: flex; align-items: center; gap: 10px; }
     .avatar {
       width: 28px; height: 28px; border-radius: 50%; background: var(--maroon-light); color: var(--maroon-dark);
@@ -512,9 +550,12 @@
 <!-- LOGIN SCREEN -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <div class="login-header">
-      <div class="login-icon">🏫</div>
-      <h1>BCMA Grades Portal</h1>
+    <div class="login-header" id="loginHeader">
+      <div class="login-icon" id="loginIconBox">
+        <span id="loginIconEmoji">🏫</span>
+        <img id="loginIconImg" class="hidden" alt="" />
+      </div>
+      <h1 id="loginTitle">BCMA Grades Portal</h1>
       <p>Manage students, grades, and announcements</p>
     </div>
     <div class="login-body">
@@ -551,7 +592,10 @@
 <div id="adminScreen" class="container" style="display: none;">
   <div class="sidebar">
     <div class="brand">
-      <div class="brand-logo">🏫</div>
+      <div class="brand-logo">
+        <span id="brandLogoEmoji">🏫</span>
+        <img id="brandLogoImg" class="hidden" alt="" />
+      </div>
       <div>
         <div class="brand-name" id="brandName">BCMA Grades Portal</div>
         <div class="brand-subtitle">Admin Dashboard</div>
@@ -890,6 +934,87 @@
 
         <div class="card">
           <div class="card-header">
+            <h3>School Branding</h3>
+            <div class="card-subtitle">Logo, banner, colors, and display name shown across the admin dashboard and parent portal</div>
+          </div>
+          <div class="card-body">
+            <div class="settings-grid">
+              <div class="form-group">
+                <label>Logo</label>
+                <div class="branding-preview-box" id="logoPreviewBox">
+                  <span id="logoPreviewEmoji">🏫</span>
+                  <img id="logoPreviewImg" class="hidden" alt="Logo preview" />
+                </div>
+                <p class="branding-hint">Square works best (e.g. 512×512). Shown in the sidebar, login screen, and parent portal header.</p>
+                <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="handleLogoFileSelected(event)" />
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                  <button class="btn btn-outline btn-sm" onclick="document.getElementById('logoFileInput').click()">Upload Logo</button>
+                  <button class="btn btn-outline btn-sm" onclick="removeBrandingImage('logo')">Remove</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Login / Header Banner</label>
+                <div class="branding-banner-preview" id="bannerPreviewBox">
+                  <span id="bannerPreviewPlaceholder">No banner uploaded</span>
+                  <img id="bannerPreviewImg" class="hidden" alt="Banner preview" />
+                </div>
+                <p class="branding-hint">Wide image (e.g. 1600×400). Shown behind the login card and at the top of the parent portal.</p>
+                <input type="file" id="bannerFileInput" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="handleBannerFileSelected(event)" />
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                  <button class="btn btn-outline btn-sm" onclick="document.getElementById('bannerFileInput').click()">Upload Banner</button>
+                  <button class="btn btn-outline btn-sm" onclick="removeBrandingImage('banner')">Remove</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-grid" style="margin-top:18px;">
+              <div class="form-group">
+                <label>Primary Color</label><br>
+                <input type="color" id="primaryColorInput" value="#7a1f2b" oninput="updateBrandingPreview()" />
+              </div>
+              <div class="form-group">
+                <label>Accent Color</label><br>
+                <input type="color" id="accentColorInput" value="#b8860b" oninput="updateBrandingPreview()" />
+              </div>
+            </div>
+            <a href="#" class="reset-link" onclick="resetBrandingColors(event)">Reset to default</a>
+
+            <div class="form-group" style="margin-top:18px;">
+              <label>Portal Display Name</label>
+              <input type="text" id="displayNameInput" placeholder="e.g. BCMA Grades Portal" oninput="updateBrandingPreview()" />
+            </div>
+
+            <div class="field-label">Live Preview</div>
+            <div class="branding-mini-preview">
+              <div class="mini-sidebar" id="miniSidebar">
+                <div class="mini-logo" id="miniLogo">
+                  <span id="miniLogoEmoji">🏫</span>
+                  <img id="miniLogoImg" class="hidden" alt="" />
+                </div>
+                <div class="mini-title" id="miniTitle">BCMA Grades Portal</div>
+              </div>
+              <div class="mini-login">
+                <div class="mini-login-header" id="miniLoginHeader">
+                  <div class="mini-logo" id="miniLoginLogo">
+                    <span id="miniLoginLogoEmoji">🏫</span>
+                    <img id="miniLoginLogoImg" class="hidden" alt="" />
+                  </div>
+                  <div class="mini-login-title" id="miniLoginTitle">BCMA Grades Portal</div>
+                </div>
+                <div class="mini-login-body">Sign in form preview</div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
+              <button class="btn btn-primary" onclick="saveBranding()">Save Branding</button>
+              <span class="saved-indicator hidden" id="brandingSaved">✓ Saved</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
             <h3>Quarter Release Status</h3>
             <div class="card-subtitle">Click a quarter to cycle: Not Started → In Progress → Released to Parents</div>
           </div>
@@ -903,6 +1028,8 @@
 <script>
   // Check if already logged in
 window.addEventListener('DOMContentLoaded', () => {
+  applyBranding();
+
   const savedToken = localStorage.getItem('adminToken');
   if (savedToken) {
     authToken = savedToken;
@@ -936,6 +1063,106 @@ window.addEventListener('DOMContentLoaded', () => {
   let addStudentFormOpen = false;
   let expandedStudentId = null;
   let currentUserRole = null;
+  const DEFAULT_PRIMARY_COLOR = '#7a1f2b';
+  const DEFAULT_ACCENT_COLOR = '#b8860b';
+
+  // ---------- Branding (white-label) ----------
+  function hexToRgb(hex) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return null;
+    return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+  }
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  }
+  function darkenHex(hex, amount) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return hex;
+    return rgbToHex(rgb.r * (1 - amount), rgb.g * (1 - amount), rgb.b * (1 - amount));
+  }
+  function tintHex(hex, amount) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return hex;
+    return rgbToHex(rgb.r + (255 - rgb.r) * amount, rgb.g + (255 - rgb.g) * amount, rgb.b + (255 - rgb.b) * amount);
+  }
+  function hexToRgba(hex, alpha) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return `rgba(0,0,0,${alpha})`;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+  }
+
+  function applyColors(primaryColor, accentColor) {
+    if (primaryColor) {
+      document.documentElement.style.setProperty('--maroon', primaryColor);
+      document.documentElement.style.setProperty('--maroon-dark', darkenHex(primaryColor, 0.18));
+      document.documentElement.style.setProperty('--maroon-light', tintHex(primaryColor, 0.88));
+    }
+    if (accentColor) {
+      document.documentElement.style.setProperty('--gold', accentColor);
+      document.documentElement.style.setProperty('--gold-light', tintHex(accentColor, 0.88));
+    }
+  }
+
+  function setLogoImage(url) {
+    ['brandLogoImg', 'loginIconImg'].forEach(imgId => {
+      const img = document.getElementById(imgId);
+      if (!img) return;
+      const emoji = document.getElementById(imgId.replace('Img', 'Emoji'));
+      img.onload = () => { img.classList.remove('hidden'); if (emoji) emoji.classList.add('hidden'); };
+      img.onerror = () => { img.classList.add('hidden'); if (emoji) emoji.classList.remove('hidden'); };
+      img.src = url;
+    });
+
+    let iconLink = document.querySelector('link[rel="icon"]');
+    if (!iconLink) {
+      iconLink = document.createElement('link');
+      iconLink.rel = 'icon';
+      document.head.appendChild(iconLink);
+    }
+    iconLink.href = url;
+  }
+
+  function setBannerBackground(url, scrimColor) {
+    const header = document.getElementById('loginHeader');
+    if (!header) return;
+    header.style.backgroundImage =
+      `linear-gradient(${hexToRgba(scrimColor, 0.78)}, ${hexToRgba(darkenHex(scrimColor, 0.18), 0.85)}), url('${url}')`;
+    header.style.backgroundSize = 'cover';
+    header.style.backgroundPosition = 'center';
+  }
+
+  // Fetched before login (public endpoint) so the login screen itself is
+  // branded. Failures here fall back to this app's built-in defaults -
+  // branding is never allowed to block the rest of the app from working.
+  async function applyBranding() {
+    try {
+      const response = await fetch(`${API_BASE}/branding?schoolId=1`);
+      const data = await response.json();
+
+      if (data.display_name) {
+        document.title = data.display_name;
+        const brandNameEl = document.getElementById('brandName');
+        if (brandNameEl) brandNameEl.textContent = data.display_name;
+        const loginTitleEl = document.getElementById('loginTitle');
+        if (loginTitleEl) loginTitleEl.textContent = data.display_name;
+      }
+
+      applyColors(data.primary_color, data.accent_color);
+
+      const v = data.updated_at ? new Date(data.updated_at).getTime() : Date.now();
+
+      if (data.hasLogo) {
+        setLogoImage(`${API_BASE}/branding/logo?schoolId=1&v=${v}`);
+      }
+
+      if (data.hasBanner) {
+        setBannerBackground(`${API_BASE}/branding/banner?schoolId=1&v=${v}`, data.primary_color || DEFAULT_PRIMARY_COLOR);
+      }
+
+    } catch (error) {
+      console.error('Failed to load branding (using defaults):', error.message);
+    }
+  }
 
   const DEFAULT_SUBJECTS = [
     'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan',
@@ -1009,7 +1236,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (btn.dataset.section === 'overview') loadOverview();
       if (btn.dataset.section === 'remarks') loadRemarksValues();
-      if (btn.dataset.section === 'settings') { loadSchoolInfo(); renderSettingsQuartersList(); }
+      if (btn.dataset.section === 'settings') { loadSchoolInfo(); renderSettingsQuartersList(); loadBrandingSettings(); }
     });
   });
 
@@ -1373,10 +1600,9 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Single source of truth for the school name - update the sidebar too,
-      // so editing it in School Settings updates it everywhere it's shown.
-      document.getElementById('brandName').textContent = school.name || 'School';
-
+      // Note: the sidebar/title brand name comes from the *branding*
+      // display_name (see applyBranding()), not this official records name -
+      // they're intentionally separate fields now (School Branding section).
       document.getElementById('setSchoolName').value = school.name || '';
       document.getElementById('setAddress').value = school.address || '';
       document.getElementById('setDirector').value = school.director || '';
@@ -1402,10 +1628,216 @@ window.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
 
       if (response.ok) {
-        document.getElementById('brandName').textContent = data.school.name || 'School';
         const savedEl = document.getElementById('schoolInfoSaved');
         savedEl.classList.remove('hidden');
         setTimeout(() => savedEl.classList.add('hidden'), 2000);
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // ---------- School Branding ----------
+  const brandingState = {
+    logoDataUrl: null, logoRemoved: false,
+    bannerDataUrl: null, bannerRemoved: false
+  };
+
+  function dataUrlParts(dataUrl) {
+    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl || '');
+    if (!match) return null;
+    return { contentType: match[1], data: match[2] };
+  }
+
+  function handleLogoFileSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Logo must be 2MB or smaller');
+      event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      brandingState.logoDataUrl = reader.result;
+      brandingState.logoRemoved = false;
+      const box = document.getElementById('logoPreviewImg');
+      box.src = reader.result;
+      box.classList.remove('hidden');
+      document.getElementById('logoPreviewEmoji').classList.add('hidden');
+      updateBrandingPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleBannerFileSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Banner must be 4MB or smaller');
+      event.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      brandingState.bannerDataUrl = reader.result;
+      brandingState.bannerRemoved = false;
+      const img = document.getElementById('bannerPreviewImg');
+      img.src = reader.result;
+      img.classList.remove('hidden');
+      document.getElementById('bannerPreviewPlaceholder').classList.add('hidden');
+      updateBrandingPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeBrandingImage(type) {
+    if (type === 'logo') {
+      brandingState.logoDataUrl = null;
+      brandingState.logoRemoved = true;
+      document.getElementById('logoPreviewImg').classList.add('hidden');
+      document.getElementById('logoPreviewEmoji').classList.remove('hidden');
+      document.getElementById('logoFileInput').value = '';
+    } else {
+      brandingState.bannerDataUrl = null;
+      brandingState.bannerRemoved = true;
+      document.getElementById('bannerPreviewImg').classList.add('hidden');
+      document.getElementById('bannerPreviewPlaceholder').classList.remove('hidden');
+      document.getElementById('bannerFileInput').value = '';
+    }
+    updateBrandingPreview();
+  }
+
+  function resetBrandingColors(event) {
+    event.preventDefault();
+    document.getElementById('primaryColorInput').value = DEFAULT_PRIMARY_COLOR;
+    document.getElementById('accentColorInput').value = DEFAULT_ACCENT_COLOR;
+    updateBrandingPreview();
+  }
+
+  // Purely client-side - reflects unsaved form state so the admin can see
+  // the effect before clicking Save Branding.
+  function updateBrandingPreview() {
+    const primary = document.getElementById('primaryColorInput').value;
+    const accent = document.getElementById('accentColorInput').value;
+    const displayName = document.getElementById('displayNameInput').value || 'BCMA Grades Portal';
+
+    document.getElementById('miniSidebar').style.background = primary;
+    document.getElementById('miniLoginHeader').style.background = primary;
+    document.getElementById('miniLogo').style.background = accent;
+    document.getElementById('miniLoginLogo').style.background = accent;
+    document.getElementById('miniTitle').textContent = displayName;
+    document.getElementById('miniLoginTitle').textContent = displayName;
+
+    const logoPreviewImg = document.getElementById('logoPreviewImg');
+    const logoSrc = brandingState.logoRemoved
+      ? null
+      : (brandingState.logoDataUrl || (!logoPreviewImg.classList.contains('hidden') ? logoPreviewImg.src : null));
+    ['miniLogoImg', 'miniLoginLogoImg'].forEach(id => {
+      const img = document.getElementById(id);
+      const emoji = document.getElementById(id.replace('Img', 'Emoji'));
+      if (logoSrc) {
+        img.src = logoSrc;
+        img.classList.remove('hidden');
+        emoji.classList.add('hidden');
+      } else {
+        img.classList.add('hidden');
+        emoji.classList.remove('hidden');
+      }
+    });
+
+    const bannerImg = document.getElementById('bannerPreviewImg');
+    const bannerSrc = brandingState.bannerRemoved ? null : (brandingState.bannerDataUrl || (!bannerImg.classList.contains('hidden') ? bannerImg.src : null));
+    const header = document.getElementById('miniLoginHeader');
+    if (bannerSrc) {
+      header.style.backgroundImage = `linear-gradient(${hexToRgba(primary, 0.75)}, ${hexToRgba(darkenHex(primary, 0.18), 0.85)}), url('${bannerSrc}')`;
+    } else {
+      header.style.backgroundImage = 'none';
+    }
+  }
+
+  async function loadBrandingSettings() {
+    try {
+      const response = await fetch(`${API_BASE}/branding?schoolId=1`);
+      const data = await response.json();
+
+      document.getElementById('displayNameInput').value = data.display_name || '';
+      document.getElementById('primaryColorInput').value = data.primary_color || DEFAULT_PRIMARY_COLOR;
+      document.getElementById('accentColorInput').value = data.accent_color || DEFAULT_ACCENT_COLOR;
+
+      brandingState.logoDataUrl = null;
+      brandingState.logoRemoved = false;
+      brandingState.bannerDataUrl = null;
+      brandingState.bannerRemoved = false;
+
+      const v = data.updated_at ? new Date(data.updated_at).getTime() : Date.now();
+
+      const logoImg = document.getElementById('logoPreviewImg');
+      const logoEmoji = document.getElementById('logoPreviewEmoji');
+      if (data.hasLogo) {
+        logoImg.src = `${API_BASE}/branding/logo?schoolId=1&v=${v}`;
+        logoImg.classList.remove('hidden');
+        logoEmoji.classList.add('hidden');
+      } else {
+        logoImg.classList.add('hidden');
+        logoEmoji.classList.remove('hidden');
+      }
+
+      const bannerImg = document.getElementById('bannerPreviewImg');
+      const bannerPlaceholder = document.getElementById('bannerPreviewPlaceholder');
+      if (data.hasBanner) {
+        bannerImg.src = `${API_BASE}/branding/banner?schoolId=1&v=${v}`;
+        bannerImg.classList.remove('hidden');
+        bannerPlaceholder.classList.add('hidden');
+      } else {
+        bannerImg.classList.add('hidden');
+        bannerPlaceholder.classList.remove('hidden');
+      }
+
+      updateBrandingPreview();
+
+    } catch (error) {
+      console.error('Failed to load branding settings:', error.message);
+    }
+  }
+
+  async function saveBranding() {
+    const payload = {
+      displayName: document.getElementById('displayNameInput').value,
+      primaryColor: document.getElementById('primaryColorInput').value,
+      accentColor: document.getElementById('accentColorInput').value
+    };
+
+    if (brandingState.logoRemoved) {
+      payload.removeLogo = true;
+    } else if (brandingState.logoDataUrl) {
+      const parts = dataUrlParts(brandingState.logoDataUrl);
+      if (parts) payload.logo = parts;
+    }
+
+    if (brandingState.bannerRemoved) {
+      payload.removeBanner = true;
+    } else if (brandingState.bannerDataUrl) {
+      const parts = dataUrlParts(brandingState.bannerDataUrl);
+      if (parts) payload.banner = parts;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/branding`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        const savedEl = document.getElementById('brandingSaved');
+        savedEl.classList.remove('hidden');
+        setTimeout(() => savedEl.classList.add('hidden'), 2000);
+        await loadBrandingSettings();
+        await applyBranding(); // refresh the real sidebar/login immediately
       } else {
         alert('Error: ' + data.error);
       }

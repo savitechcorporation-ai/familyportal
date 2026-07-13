@@ -19,24 +19,91 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const sharp = require('sharp');
 const { Client } = require('pg');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '8mb' })); // raised to fit base64-encoded logo/banner uploads (2MB/4MB caps)
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '8mb' })); // raised to fit base64-encoded logo/banner uploads (2MB/4MB caps)
 app.use(express.static(__dirname));
 
 // Clean URL for the new admin portal (the file itself is still reachable at /admin-portal.html)
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-portal.html'));
 });
+
+// ==================== BRANDING (public - login pages need this pre-auth) ====================
+// This app is single-tenant-per-deployment in practice (every other page
+// already defaults to schoolId=1, e.g. the demo login credentials and the
+// SCHOOL_YEAR default) - branding follows the same convention.
+
+app.get('/api/branding', async (req, res) => {
+  const schoolId = parseInt(req.query.schoolId) || 1;
+
+  try {
+    const result = await client.query(
+      `SELECT display_name, name, primary_color, accent_color,
+              (logo IS NOT NULL) AS "hasLogo",
+              (banner IS NOT NULL) AS "hasBanner",
+              branding_updated_at
+       FROM schools WHERE id = $1`,
+      [schoolId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ display_name: null, primary_color: null, accent_color: null, hasLogo: false, hasBanner: false, updated_at: null });
+    }
+
+    const row = result.rows[0];
+    res.json({
+      display_name: row.display_name || row.name || null,
+      primary_color: row.primary_color,
+      accent_color: row.accent_color,
+      hasLogo: row.hasLogo,
+      hasBanner: row.hasBanner,
+      updated_at: row.branding_updated_at
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function sendBrandingImage(req, res, column, contentTypeColumn) {
+  const schoolId = parseInt(req.query.schoolId) || 1;
+
+  try {
+    const result = await client.query(
+      `SELECT ${column} AS image, ${contentTypeColumn} AS content_type FROM schools WHERE id = $1`,
+      [schoolId]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].image) {
+      return res.status(404).end();
+    }
+
+    res.set('Content-Type', result.rows[0].content_type || 'image/png');
+    res.set('Cache-Control', 'public, max-age=31536000, immutable'); // safe: frontend cache-busts via ?v=updated_at
+    res.send(result.rows[0].image);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+app.get('/api/branding/logo', (req, res) => sendBrandingImage(req, res, 'logo', 'logo_content_type'));
+app.get('/api/branding/banner', (req, res) => sendBrandingImage(req, res, 'banner', 'banner_content_type'));
+
+// Covers browsers that request this path directly; both frontends also set
+// an explicit <link rel="icon"> pointing at /api/branding/logo for reliability.
+app.get('/favicon.ico', (req, res) => sendBrandingImage(req, res, 'logo', 'logo_content_type'));
 
 // ==================== DATABASE SETUP ====================
 
@@ -94,6 +161,34 @@ function generateToken(user) {
     { expiresIn: '7d' }
   );
 }
+
+// Identify an image by its actual bytes, not whatever content-type or
+// extension the client claims - a renamed .txt file must not pass as a PNG.
+function detectImageType(buffer) {
+  if (buffer.length >= 8 &&
+      buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+    return 'png';
+  }
+  if (buffer.length >= 3 &&
+      buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'jpeg';
+  }
+  if (buffer.length >= 12 &&
+      buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return 'webp';
+  }
+  return null;
+}
+
+// Cap dimensions server-side so a 20MP upload never gets served to every
+// parent's phone. Format-preserving, never upscales a smaller source image.
+async function resizeImage(buffer, maxWidth, maxHeight) {
+  return sharp(buffer)
+    .resize(maxWidth, maxHeight, { fit: 'inside', withoutEnlargement: true })
+    .toBuffer();
+}
+
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 // ==================== ROUTES ====================
 
@@ -1024,6 +1119,92 @@ app.patch('/api/admin/school', verifyToken, async (req, res) => {
     );
 
     res.json({ success: true, school: result.rows[0] });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7o2. SAVE BRANDING (logo, banner, colors, display name) - Admin only
+app.patch('/api/admin/branding', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { displayName, primaryColor, accentColor, logo, banner, removeLogo, removeBanner } = req.body;
+
+  if (primaryColor && !HEX_COLOR_RE.test(primaryColor)) {
+    return res.status(400).json({ error: 'Invalid primary color' });
+  }
+  if (accentColor && !HEX_COLOR_RE.test(accentColor)) {
+    return res.status(400).json({ error: 'Invalid accent color' });
+  }
+
+  try {
+    const updates = ['branding_updated_at = NOW()'];
+    const params = [];
+
+    if (displayName !== undefined) {
+      params.push(displayName);
+      updates.push(`display_name = $${params.length}`);
+    }
+    if (primaryColor) {
+      params.push(primaryColor);
+      updates.push(`primary_color = $${params.length}`);
+    }
+    if (accentColor) {
+      params.push(accentColor);
+      updates.push(`accent_color = $${params.length}`);
+    }
+
+    if (removeLogo) {
+      updates.push('logo = NULL', 'logo_content_type = NULL');
+    } else if (logo && logo.data) {
+      const buffer = Buffer.from(logo.data, 'base64');
+      if (buffer.length > 2 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Logo must be 2MB or smaller' });
+      }
+      const detectedType = detectImageType(buffer);
+      if (!detectedType) {
+        return res.status(400).json({ error: 'Logo must be a PNG, JPEG, or WebP image' });
+      }
+      const resized = await resizeImage(buffer, 512, 512);
+      params.push(resized);
+      updates.push(`logo = $${params.length}`);
+      params.push(`image/${detectedType}`);
+      updates.push(`logo_content_type = $${params.length}`);
+    }
+
+    if (removeBanner) {
+      updates.push('banner = NULL', 'banner_content_type = NULL');
+    } else if (banner && banner.data) {
+      const buffer = Buffer.from(banner.data, 'base64');
+      if (buffer.length > 4 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Banner must be 4MB or smaller' });
+      }
+      const detectedType = detectImageType(buffer);
+      if (!detectedType) {
+        return res.status(400).json({ error: 'Banner must be a PNG, JPEG, or WebP image' });
+      }
+      const resized = await resizeImage(buffer, 1600, 400);
+      params.push(resized);
+      updates.push(`banner = $${params.length}`);
+      params.push(`image/${detectedType}`);
+      updates.push(`banner_content_type = $${params.length}`);
+    }
+
+    params.push(req.user.schoolId);
+
+    const result = await client.query(
+      `UPDATE schools SET ${updates.join(', ')}
+       WHERE id = $${params.length}
+       RETURNING display_name, primary_color, accent_color,
+                 (logo IS NOT NULL) AS "hasLogo", (banner IS NOT NULL) AS "hasBanner",
+                 branding_updated_at`,
+      params
+    );
+
+    res.json({ success: true, branding: result.rows[0] });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
