@@ -296,6 +296,70 @@ app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
   }
 });
 
+// 4b. GET REMARKS & CORE VALUES for a student (parent-facing)
+// Same release-gating pattern as grades/attendance above: parents only see
+// quarters with status = 'released'; staff/admin see everything. This is
+// where the parent portal's release check for remarks/values lives - no
+// frontend on the parent side calls it yet (no Remarks UI exists there),
+// but the data is already correctly gated for whenever that's built.
+app.get('/api/remarks-values/:studentId', verifyToken, async (req, res) => {
+  const { studentId } = req.params;
+  const schoolYear = req.query.schoolYear || '2026-2027';
+
+  try {
+    const studentCheck = await client.query(
+      `SELECT id, parent_id FROM students
+       WHERE id = $1 AND school_id = $2`,
+      [studentId, req.user.schoolId]
+    );
+
+    if (studentCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (req.user.role === 'parent' && studentCheck.rows[0].parent_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const bypassRelease = req.user.role !== 'parent';
+
+    const remarksResult = await client.query(
+      `SELECT q.id AS quarter_id, q.label, q.short, r.body AS remarks
+       FROM quarters q
+       LEFT JOIN remarks r ON r.quarter_id = q.id AND r.student_id = $1
+       WHERE q.school_id = $2 AND q.school_year = $3
+         AND ($4 = true OR q.status = 'released')
+       ORDER BY q.sort_order ASC`,
+      [studentId, req.user.schoolId, schoolYear, bypassRelease]
+    );
+
+    const valuesResult = await client.query(
+      `SELECT q.id AS quarter_id, vr.core_value, vr.rating
+       FROM quarters q
+       JOIN values_ratings vr ON vr.quarter_id = q.id AND vr.student_id = $1
+       WHERE q.school_id = $2 AND q.school_year = $3
+         AND ($4 = true OR q.status = 'released')`,
+      [studentId, req.user.schoolId, schoolYear, bypassRelease]
+    );
+
+    const valuesByQuarter = {};
+    valuesResult.rows.forEach(v => {
+      if (!valuesByQuarter[v.quarter_id]) valuesByQuarter[v.quarter_id] = {};
+      valuesByQuarter[v.quarter_id][v.core_value] = v.rating;
+    });
+
+    res.json(remarksResult.rows.map(r => ({
+      quarter: r.label,
+      short: r.short,
+      remarks: r.remarks || null,
+      values: valuesByQuarter[r.quarter_id] || {}
+    })));
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 5. GET ANNOUNCEMENTS
 app.get('/api/announcements/:schoolId', verifyToken, async (req, res) => {
   const { schoolId } = req.params;
@@ -1178,6 +1242,7 @@ Authentication:
 Portal (requires token):
   GET    /api/grades/:studentId    - Get student grades
   GET    /api/attendance/:studentId - Get attendance
+  GET    /api/remarks-values/:studentId - Get remarks & core values
   GET    /api/announcements/:schoolId - Get announcements
 
 Admin Only (requires token):

@@ -390,6 +390,24 @@
     }
     .quarter-list-item:last-child { border-bottom: none; }
 
+    /* School Settings */
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .settings-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 13px 0; border-bottom: 1px solid #f1ece1;
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row .quarter-name { font-weight: 700; font-size: 13px; color: var(--ink); }
+    .pill-btn {
+      border: 1px solid var(--border); background: white; border-radius: 999px;
+      padding: 4px 6px; cursor: pointer;
+    }
+    .pill-btn:hover { background: var(--surface); }
+
+    @media (max-width: 700px) {
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+
     .avatar-name { display: flex; align-items: center; gap: 10px; }
     .avatar {
       width: 28px; height: 28px; border-radius: 50%; background: var(--maroon-light); color: var(--maroon-dark);
@@ -535,7 +553,7 @@
     <div class="brand">
       <div class="brand-logo">🏫</div>
       <div>
-        <div class="brand-name">BCMA Grades Portal</div>
+        <div class="brand-name" id="brandName">BCMA Grades Portal</div>
         <div class="brand-subtitle">Admin Dashboard</div>
       </div>
     </div>
@@ -550,6 +568,7 @@
       <li><button class="menu-btn" data-section="remarks">💬 Remarks &amp; Values</button></li>
       <li><button class="menu-btn" data-section="announcements">📢 Announcements</button></li>
       <li><button class="menu-btn" data-section="checkedsync">🔄 CheckEd Sync</button></li>
+      <li id="settingsNavItem"><button class="menu-btn" data-section="settings">⚙️ School Settings</button></li>
     </ul>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="handleLogout()">🚪 Sign Out</button>
@@ -836,6 +855,47 @@
           <button class="btn btn-primary" onclick="syncAttendance()">Sync Attendance</button>
         </div>
       </div>
+
+      <!-- SCHOOL SETTINGS SECTION -->
+      <div id="settingsSection" class="section">
+        <div class="card">
+          <div class="card-header">
+            <h3>School Information</h3>
+          </div>
+          <div class="card-body">
+            <div class="settings-grid">
+              <div class="form-group">
+                <label>School Name</label>
+                <input type="text" id="setSchoolName" placeholder="e.g. Bicol for Christ Mission Academy" />
+              </div>
+              <div class="form-group">
+                <label>Address</label>
+                <input type="text" id="setAddress" />
+              </div>
+              <div class="form-group">
+                <label id="setDirectorLabel">School Head / President</label>
+                <input type="text" id="setDirector" />
+              </div>
+              <div class="form-group">
+                <label>Registrar</label>
+                <input type="text" id="setRegistrar" />
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:6px;">
+              <button class="btn btn-primary" onclick="saveSchoolInfo()">Save Changes</button>
+              <span class="saved-indicator hidden" id="schoolInfoSaved">✓ Saved</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Quarter Release Status</h3>
+            <div class="card-subtitle">Click a quarter to cycle: Not Started → In Progress → Released to Parents</div>
+          </div>
+          <div class="card-body" id="settingsQuartersList"></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -846,10 +906,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedToken = localStorage.getItem('adminToken');
   if (savedToken) {
     authToken = savedToken;
+    currentUserRole = localStorage.getItem('adminRole') || 'admin';
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminScreen').style.display = 'flex';
+    applyRoleVisibility();
     loadStudents();
     loadQuarters();
+    loadSchoolInfo();
   }
 
   populateSubjectOptions();
@@ -872,6 +935,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let studentGradeLevelFilter = '';
   let addStudentFormOpen = false;
   let expandedStudentId = null;
+  let currentUserRole = null;
 
   const DEFAULT_SUBJECTS = [
     'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan',
@@ -936,7 +1000,8 @@ window.addEventListener('DOMContentLoaded', () => {
         grades: ['Grades', 'Add and update student quarterly grades'],
         remarks: ['Remarks & Values', "Adviser comments and core values ratings"],
         announcements: ['Announcements', 'Post updates for parents'],
-        checkedsync: ['CheckEd Sync', 'Sync attendance from CheckEd']
+        checkedsync: ['CheckEd Sync', 'Sync attendance from CheckEd'],
+        settings: ['School Settings', 'School info and quarter release control']
       };
       const [title, subtitle] = titles[btn.dataset.section];
       document.getElementById('sectionTitle').textContent = title;
@@ -944,6 +1009,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (btn.dataset.section === 'overview') loadOverview();
       if (btn.dataset.section === 'remarks') loadRemarksValues();
+      if (btn.dataset.section === 'settings') { loadSchoolInfo(); renderSettingsQuartersList(); }
     });
   });
 
@@ -976,18 +1042,30 @@ window.addEventListener('DOMContentLoaded', () => {
       }
 
       authToken = data.token;
+      currentUserRole = data.user.role;
       localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminRole', data.user.role);
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('adminScreen').style.display = 'flex';
       document.getElementById('userInfo').textContent = `${data.user.name} (${data.user.school_name})`;
+      applyRoleVisibility();
 
       loadStudents();
       loadQuarters();
+      loadSchoolInfo();
 
     } catch (error) {
       errorDiv.textContent = 'Connection error: ' + error.message;
       errorDiv.style.display = 'block';
     }
+  }
+
+  // School Settings is admin-only - the backend already rejects non-admins
+  // on every /api/admin/* route (403), this just hides the nav item so a
+  // teacher account isn't shown a page that would error out for them.
+  function applyRoleVisibility() {
+    const settingsNav = document.getElementById('settingsNavItem');
+    settingsNav.style.display = currentUserRole === 'admin' ? '' : 'none';
   }
 
   // Load students (fetched once; search/filter below are purely client-side
@@ -1280,6 +1358,105 @@ window.addEventListener('DOMContentLoaded', () => {
     if (status === 'released') return '<span class="pill pill-green">Released to Parents</span>';
     if (status === 'in_progress') return '<span class="pill pill-yellow">In Progress</span>';
     return '<span class="pill pill-gray">Not Started</span>';
+  }
+
+  // ---------- School Settings ----------
+  async function loadSchoolInfo() {
+    try {
+      const response = await fetch(`${API_BASE}/admin/school`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const school = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to load school info:', school.error);
+        return;
+      }
+
+      // Single source of truth for the school name - update the sidebar too,
+      // so editing it in School Settings updates it everywhere it's shown.
+      document.getElementById('brandName').textContent = school.name || 'School';
+
+      document.getElementById('setSchoolName').value = school.name || '';
+      document.getElementById('setAddress').value = school.address || '';
+      document.getElementById('setDirector').value = school.director || '';
+      document.getElementById('setRegistrar').value = school.registrar || '';
+
+    } catch (error) {
+      console.error('Failed to load school info:', error.message);
+    }
+  }
+
+  async function saveSchoolInfo() {
+    const name = document.getElementById('setSchoolName').value;
+    const address = document.getElementById('setAddress').value;
+    const director = document.getElementById('setDirector').value;
+    const registrar = document.getElementById('setRegistrar').value;
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/school`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ name, address, director, registrar })
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        document.getElementById('brandName').textContent = data.school.name || 'School';
+        const savedEl = document.getElementById('schoolInfoSaved');
+        savedEl.classList.remove('hidden');
+        setTimeout(() => savedEl.classList.add('hidden'), 2000);
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+
+  function renderSettingsQuartersList() {
+    const list = document.getElementById('settingsQuartersList');
+
+    if (!quarters || quarters.length === 0) {
+      list.innerHTML = `<div style="color:var(--muted); font-size:13px;">No quarters set up yet.</div>`;
+      return;
+    }
+
+    list.innerHTML = quarters.map(q => `
+      <div class="settings-row">
+        <span class="quarter-name">${q.label}</span>
+        <button class="pill-btn" onclick="cycleQuarterStatus(${q.id}, '${q.status}')">${quarterStatusPill(q.status)}</button>
+      </div>
+    `).join('');
+  }
+
+  async function cycleQuarterStatus(quarterId, currentStatus) {
+    const next = { not_started: 'in_progress', in_progress: 'released', released: 'not_started' };
+    const newStatus = next[currentStatus] || 'not_started';
+
+    // Un-releasing hides this quarter's grades/attendance from parents immediately - confirm first.
+    if (currentStatus === 'released' && newStatus !== 'released') {
+      if (!confirm("Parents will lose access to this quarter's grades. Continue?")) return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/quarters/${quarterId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        quarters = quarters.map(q => q.id === quarterId ? { ...q, status: newStatus } : q);
+        renderSettingsQuartersList();
+        if (document.getElementById('overviewSection').classList.contains('active')) loadOverview();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
   }
 
   // Load quarters for the sidebar picker and the Overview page
@@ -1612,6 +1789,8 @@ window.addEventListener('DOMContentLoaded', () => {
     quarters = [];
     activeQuarterId = null;
     expandedStudentId = null;
+    currentUserRole = null;
+    localStorage.removeItem('adminRole');
     document.getElementById('adminScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('adminEmail').value = '';
