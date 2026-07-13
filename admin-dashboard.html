@@ -395,6 +395,41 @@
       width: 28px; height: 28px; border-radius: 50%; background: var(--maroon-light); color: var(--maroon-dark);
       display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11.5px; flex-shrink: 0;
     }
+    .avg-line { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .contact-cell .contact-phone { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Toolbar / search / tabs */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .toolbar .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    .search-box { position: relative; }
+    .search-box .search-icon {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      font-size: 12px; color: var(--muted); pointer-events: none;
+    }
+    .search-box input {
+      padding: 9px 12px 9px 32px; border: 1px solid var(--border); border-radius: 999px;
+      font-size: 12.5px; width: 230px; background: white; font-family: var(--font);
+    }
+    .search-box input:focus { outline: none; border-color: var(--maroon); }
+
+    .tab-group {
+      display: flex; gap: 3px; background: var(--surface); border-radius: 999px; padding: 3px;
+    }
+    .tab-btn {
+      padding: 6px 13px; border-radius: 999px; border: none; background: transparent;
+      color: var(--slate); font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .tab-btn.active { background: white; color: var(--maroon); box-shadow: var(--shadow); }
+
+    .add-form-card { display: none; }
+    .add-form-card.open { display: block; }
+
+    .btn-outline {
+      background: white; color: var(--slate); border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: var(--surface); }
+    .btn-sm { padding: 6px 12px; font-size: 11.5px; }
 
     .table-scroll { overflow-x: auto; }
 
@@ -544,7 +579,18 @@
       <div id="studentsSection" class="section">
         <div class="success-msg" id="studentSuccess"></div>
 
-        <div class="form-card">
+        <div class="toolbar">
+          <div class="filters">
+            <div class="search-box">
+              <span class="search-icon">🔎</span>
+              <input type="text" id="studentSearch" placeholder="Search name, LRN, or section..." oninput="renderStudentsTable()" />
+            </div>
+            <div class="tab-group" id="gradeLevelTabs"></div>
+          </div>
+          <button class="btn btn-primary" id="addStudentToggleBtn" onclick="toggleAddStudentForm()">+ Add Student</button>
+        </div>
+
+        <div class="form-card add-form-card" id="addStudentCard">
           <h3>Add New Student</h3>
           <div class="form-row">
             <div class="form-group">
@@ -598,23 +644,29 @@
               <label>Section</label>
               <input type="text" id="section" placeholder="Makinabang" />
             </div>
+            <div class="form-group">
+              <label>Adviser</label>
+              <input type="text" id="adviser" placeholder="Optional" />
+            </div>
           </div>
           <button class="btn btn-primary" onclick="addStudent()">Add Student</button>
+          <button class="btn btn-outline" onclick="toggleAddStudentForm()">Cancel</button>
         </div>
 
         <div class="card">
           <div class="card-header">
             <h3>Students List</h3>
           </div>
-          <div class="card-body" style="padding:0;">
+          <div class="card-body table-scroll" style="padding:0;">
             <table class="table">
               <thead>
                 <tr>
-                  <th>Student Name</th>
-                  <th>Student #</th>
-                  <th>Grade Level</th>
-                  <th>Section</th>
-                  <th>Parent Email</th>
+                  <th>Student</th>
+                  <th>LRN</th>
+                  <th>Grade &amp; Section</th>
+                  <th>Adviser</th>
+                  <th>Parent Contact</th>
+                  <th>Status</th>
                   <th></th>
                 </tr>
               </thead>
@@ -751,11 +803,14 @@ window.addEventListener('DOMContentLoaded', () => {
 });
   const API_BASE = 'https://familyportal.onrender.com/api';
   const ORDINALS = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
+  const GRADE_LEVELS = ['Preschool','Kinder 1','Kinder 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
   let authToken = null;
   let schoolId = null;
   let knownStudents = [];
   let quarters = [];
   let activeQuarterId = null;
+  let studentGradeLevelFilter = '';
+  let addStudentFormOpen = false;
 
   const DEFAULT_SUBJECTS = [
     'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan',
@@ -872,10 +927,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Load students
+  // Load students (fetched once; search/filter below are purely client-side
+  // over this cached list - no server round-trip per keystroke)
   async function loadStudents() {
     try {
-      const response = await fetch(`${API_BASE}/admin/students`, {
+      const params = activeQuarterId ? `?quarterId=${activeQuarterId}` : '';
+      const response = await fetch(`${API_BASE}/admin/students${params}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
 
@@ -886,26 +943,124 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const tbody = document.getElementById('studentsList');
-      tbody.innerHTML = data.length === 0
-        ? `<tr class="empty-row"><td colspan="6">No students yet. Add your first student above.</td></tr>`
-        : data.map(student => `
-        <tr>
-          <td>${student.name}</td>
-          <td class="mono">${student.student_number || ''}</td>
-          <td>${student.grade_level || ''}</td>
-          <td>${student.section || ''}</td>
-          <td>${student.parent_email}</td>
-          <td><button class="btn btn-danger" onclick="deleteStudent(${student.id}, '${student.name.replace(/'/g, "\\'")}')">Delete</button></td>
-        </tr>
-      `).join('');
-
       knownStudents = data;
       populateStudentPickers();
+      buildGradeLevelTabs();
+      renderStudentsTable();
 
     } catch (error) {
       console.error('Failed to load students:', error.message);
     }
+  }
+
+  // Build "All Levels" + one tab per grade level actually in use
+  function buildGradeLevelTabs() {
+    const present = [...new Set(knownStudents.map(s => s.grade_level).filter(Boolean))]
+      .sort((a, b) => GRADE_LEVELS.indexOf(a) - GRADE_LEVELS.indexOf(b));
+
+    if (!present.includes(studentGradeLevelFilter)) studentGradeLevelFilter = '';
+
+    const container = document.getElementById('gradeLevelTabs');
+    const tabs = ['All Levels', ...present];
+    container.innerHTML = tabs.map(t => {
+      const value = t === 'All Levels' ? '' : t;
+      return `<button class="tab-btn ${value === studentGradeLevelFilter ? 'active' : ''}" data-level="${value}">${t}</button>`;
+    }).join('');
+
+    container.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        studentGradeLevelFilter = btn.dataset.level;
+        container.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderStudentsTable();
+      });
+    });
+  }
+
+  function initials(name) {
+    return (name || '').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
+  }
+
+  // Client-side search + grade-level filter over the already-loaded list
+  function renderStudentsTable() {
+    const searchText = (document.getElementById('studentSearch').value || '').trim().toLowerCase();
+
+    const filtered = knownStudents.filter(s => {
+      if (studentGradeLevelFilter && s.grade_level !== studentGradeLevelFilter) return false;
+      if (!searchText) return true;
+      const haystack = `${s.name} ${s.student_number || ''} ${s.section || ''}`.toLowerCase();
+      return haystack.includes(searchText);
+    });
+
+    const tbody = document.getElementById('studentsList');
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No students match your search.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(s => `
+      <tr>
+        <td>
+          <div class="avatar-name">
+            <div class="avatar">${initials(s.name)}</div>
+            <div>
+              <div style="font-weight:600;">${s.name}</div>
+              <div class="avg-line">Q avg: ${s.average !== null && s.average !== undefined ? s.average : '—'}</div>
+            </div>
+          </div>
+        </td>
+        <td class="mono">${s.student_number || '—'}</td>
+        <td>${s.grade_level || '—'}${s.section ? ' — ' + s.section : ''}</td>
+        <td>${s.adviser || '—'}</td>
+        <td class="contact-cell">
+          <div>${s.parent_name || '—'}</div>
+          <div class="contact-phone">${s.parent_phone || s.parent_email || '—'}</div>
+        </td>
+        <td>${s.status === 'inactive' ? '<span class="pill pill-gray">Inactive</span>' : '<span class="pill pill-green">Active</span>'}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-outline btn-sm" onclick="viewStudent(${s.id})">View</button>
+          <button class="btn btn-outline btn-sm" onclick="toggleStudentStatus(${s.id}, '${s.status || 'active'}')">${s.status === 'inactive' ? 'Reactivate' : 'Deactivate'}</button>
+          ${s.status === 'inactive' ? `<button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Delete</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function viewStudent(studentId) {
+    alert('Student profile view coming soon!');
+  }
+
+  async function toggleStudentStatus(studentId, currentStatus) {
+    const newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
+    const verb = newStatus === 'inactive' ? 'Deactivate' : 'Reactivate';
+    if (!confirm(`${verb} this student?`)) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/students/${studentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        loadStudents();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+
+  function toggleAddStudentForm() {
+    addStudentFormOpen = !addStudentFormOpen;
+    document.getElementById('addStudentCard').classList.toggle('open', addStudentFormOpen);
+    document.getElementById('addStudentToggleBtn').textContent = addStudentFormOpen ? 'Cancel' : '+ Add Student';
   }
 
   // Fill the Grades/CheckEd Sync student pickers from the students list
@@ -917,10 +1072,6 @@ window.addEventListener('DOMContentLoaded', () => {
     ['gradeStudentId', 'syncStudentId'].forEach(id => {
       document.getElementById(id).innerHTML = options;
     });
-  }
-
-  function initials(name) {
-    return (name || '').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
   }
 
   function quarterOrdinalLabel(q) {
@@ -959,6 +1110,7 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('yearBadge').textContent = `S.Y. ${quarters[quarters.length - 1].school_year}`;
 
       loadOverview();
+      loadStudents(); // refresh with per-quarter averages now that activeQuarterId is known
 
     } catch (error) {
       console.error('Failed to load quarters:', error.message);
@@ -970,6 +1122,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const q = quarters.find(qq => qq.id === activeQuarterId);
     if (q) document.getElementById('yearBadge').textContent = `S.Y. ${q.school_year}`;
     loadOverview();
+    loadStudents();
   }
 
   // Load the Overview page's stats for the selected quarter - always
@@ -1101,6 +1254,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const studentNumber = document.getElementById('studentNumber').value;
     const gradeLevel = document.getElementById('gradeLevel').value;
     const section = document.getElementById('section').value;
+    const adviser = document.getElementById('adviser').value;
 
     if (!parentEmail || !studentName || !studentNumber || !gradeLevel) {
       alert('Please fill required fields');
@@ -1115,7 +1269,7 @@ window.addEventListener('DOMContentLoaded', () => {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          parentEmail, parentName, parentPassword, studentName, studentNumber, gradeLevel, section
+          parentEmail, parentName, parentPassword, studentName, studentNumber, gradeLevel, section, adviser
         })
       });
 
@@ -1124,11 +1278,16 @@ window.addEventListener('DOMContentLoaded', () => {
       if (response.ok) {
         document.getElementById('studentSuccess').textContent = 'Student added successfully!';
         document.getElementById('studentSuccess').style.display = 'block';
+        setTimeout(() => { document.getElementById('studentSuccess').style.display = 'none'; }, 3000);
         document.getElementById('parentEmail').value = '';
+        document.getElementById('parentName').value = '';
+        document.getElementById('parentPassword').value = '';
         document.getElementById('studentName').value = '';
         document.getElementById('studentNumber').value = '';
         document.getElementById('gradeLevel').value = '';
         document.getElementById('section').value = '';
+        document.getElementById('adviser').value = '';
+        if (addStudentFormOpen) toggleAddStudentForm();
         loadStudents();
       } else {
         alert('Error: ' + data.error);
