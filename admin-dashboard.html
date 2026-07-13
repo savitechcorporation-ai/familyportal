@@ -195,6 +195,14 @@
     .field-error { color: var(--danger); font-size: 11px; margin-top: 5px; }
     .input-error { border-color: var(--danger) !important; }
 
+    .grade-input {
+      width: 70px; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 12.5px; text-align: center; font-family: var(--font-mono);
+    }
+    .grade-input:focus { outline: none; border-color: var(--maroon); }
+    .saving-indicator { font-size: 10.5px; color: var(--muted); margin-left: 8px; }
+    .saving-indicator.is-saved { color: var(--success); }
+
     .btn-login {
       width: 100%;
       padding: 12px;
@@ -611,7 +619,7 @@
     <ul class="sidebar-menu">
       <li><button class="menu-btn active" data-section="overview">📈 Overview</button></li>
       <li><button class="menu-btn" data-section="students">👥 Students</button></li>
-      <li><button class="menu-btn" data-section="grades">📊 Grades</button></li>
+      <li><button class="menu-btn" data-section="grades">📝 Grade Entry</button></li>
       <li><button class="menu-btn" data-section="remarks">💬 Remarks &amp; Values</button></li>
       <li><button class="menu-btn" data-section="announcements">📢 Announcements</button></li>
       <li><button class="menu-btn" data-section="checkedsync">🔄 CheckEd Sync</button></li>
@@ -801,43 +809,24 @@
         </div>
       </div>
 
-      <!-- GRADES SECTION -->
+      <!-- GRADES SECTION (Grade Entry) -->
       <div id="gradesSection" class="section">
-        <div class="success-msg" id="gradeSuccess"></div>
+        <div class="toolbar">
+          <div class="filters">
+            <div class="tab-group" id="geGradeTabs"></div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select id="geSubjectSelect" onchange="loadGradeEntryTable()"></select>
+            <span class="pill pill-maroon" id="geQuarterPill">—</span>
+          </div>
+        </div>
 
-        <div class="form-card">
-          <h3>Add/Update Grades</h3>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Student</label>
-              <select id="gradeStudentId"></select>
-            </div>
-            <div class="form-group">
-              <label>Subject</label>
-              <select id="subject" onchange="handleSubjectChange()"></select>
-            </div>
+        <div class="card">
+          <div class="card-header">
+            <h3 id="geCardTitle">Select a grade level and subject</h3>
+            <div class="card-subtitle" id="geCardSubtitle"></div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Q1 Grade</label>
-              <select id="q1"></select>
-            </div>
-            <div class="form-group">
-              <label>Q2 Grade</label>
-              <select id="q2"></select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Q3 Grade</label>
-              <select id="q3"></select>
-            </div>
-            <div class="form-group">
-              <label>Q4 Grade</label>
-              <select id="q4"></select>
-            </div>
-          </div>
-          <button class="btn btn-primary" onclick="addGrade()">Save Grade</button>
+          <div class="card-body table-scroll" style="padding:0;" id="geTableWrap"></div>
         </div>
       </div>
 
@@ -1058,9 +1047,6 @@ window.addEventListener('DOMContentLoaded', () => {
     loadQuarters();
     loadSchoolInfo();
   }
-
-  populateSubjectOptions();
-  populateGradeOptions();
 });
   const API_BASE = 'https://familyportal.onrender.com/api';
   const ORDINALS = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
@@ -1181,53 +1167,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  const DEFAULT_SUBJECTS = [
-    'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan',
-    'MAPEH', 'Edukasyon sa Pagpapakatao', 'TLE/EPP', 'Mother Tongue', 'Computer/ICT'
-  ];
-
-  function getSubjectList() {
-    const custom = JSON.parse(localStorage.getItem('customSubjects') || '[]');
-    return DEFAULT_SUBJECTS.concat(custom.filter(s => !DEFAULT_SUBJECTS.includes(s)));
-  }
-
-  function populateSubjectOptions(selected) {
-    const select = document.getElementById('subject');
-    const subjects = getSubjectList();
-    select.innerHTML = subjects.map(s => `<option value="${s}">${s}</option>`).join('')
-      + `<option value="__add_new__">+ Add new subject...</option>`;
-    if (selected) select.value = selected;
-  }
-
-  function handleSubjectChange() {
-    const select = document.getElementById('subject');
-    if (select.value !== '__add_new__') return;
-
-    const newSubject = prompt('Enter the new subject name:');
-    select.value = getSubjectList()[0] || '';
-
-    if (!newSubject || !newSubject.trim()) return;
-
-    const trimmed = newSubject.trim();
-    const custom = JSON.parse(localStorage.getItem('customSubjects') || '[]');
-    if (!custom.includes(trimmed) && !DEFAULT_SUBJECTS.includes(trimmed)) {
-      custom.push(trimmed);
-      localStorage.setItem('customSubjects', JSON.stringify(custom));
-    }
-
-    populateSubjectOptions(trimmed);
-  }
-
-  function populateGradeOptions() {
-    let options = '<option value="">Not yet graded</option>';
-    for (let g = 100; g >= 50; g--) {
-      options += `<option value="${g}">${g}</option>`;
-    }
-    ['q1', 'q2', 'q3', 'q4'].forEach(id => {
-      document.getElementById(id).innerHTML = options;
-    });
-  }
-
   // Menu navigation
   document.querySelectorAll('.menu-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1241,7 +1180,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const titles = {
         overview: ['Overview', 'School-wide snapshot'],
         students: ['Students', 'Manage enrollment and profiles'],
-        grades: ['Grades', 'Add and update student quarterly grades'],
+        grades: ['Grade Entry', 'Bulk-encode quarterly grades by class'],
         remarks: ['Remarks & Values', "Adviser comments and core values ratings"],
         announcements: ['Announcements', 'Post updates for parents'],
         checkedsync: ['CheckEd Sync', 'Sync attendance from CheckEd'],
@@ -1252,6 +1191,7 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('sectionSubtitle').textContent = subtitle;
 
       if (btn.dataset.section === 'overview') loadOverview();
+      if (btn.dataset.section === 'grades') buildGeGradeTabs();
       if (btn.dataset.section === 'remarks') loadRemarksValues();
       if (btn.dataset.section === 'settings') { loadSchoolInfo(); renderSettingsQuartersList(); loadBrandingSettings(); }
     });
@@ -1579,13 +1519,13 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addStudentToggleBtn').textContent = addStudentFormOpen ? 'Cancel' : '+ Add Student';
   }
 
-  // Fill the Grades/CheckEd Sync student pickers from the students list
+  // Fill the CheckEd Sync student picker from the students list
   function populateStudentPickers() {
     const options = knownStudents.length === 0
       ? '<option value="">No students yet</option>'
       : knownStudents.map(s => `<option value="${s.id}">${s.name}${s.student_number ? ' — ' + s.student_number : ''}</option>`).join('');
 
-    ['gradeStudentId', 'syncStudentId'].forEach(id => {
+    ['syncStudentId'].forEach(id => {
       document.getElementById(id).innerHTML = options;
     });
   }
@@ -1945,6 +1885,10 @@ window.addEventListener('DOMContentLoaded', () => {
     loadStudents();
     expandedStudentId = null; // switching quarters resets which card is auto-expanded
     if (document.getElementById('remarksSection').classList.contains('active')) loadRemarksValues();
+    if (document.getElementById('gradesSection').classList.contains('active')) {
+      document.getElementById('geQuarterPill').textContent = q ? quarterShortOrdinal(q) : '—';
+      loadGradeEntryTable();
+    }
   }
 
   // Load the Overview page's stats for the selected quarter - always
@@ -2155,41 +2099,229 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // Add Grade
-  async function addGrade() {
-    const studentId = parseInt(document.getElementById('gradeStudentId').value);
-    const subject = document.getElementById('subject').value;
-    const q1 = parseFloat(document.getElementById('q1').value);
-    const q2 = parseFloat(document.getElementById('q2').value);
-    const q3 = parseFloat(document.getElementById('q3').value);
-    const q4 = parseFloat(document.getElementById('q4').value);
+  // ---------- Grade Entry ----------
+  let geGradeLevel = '';
+  let geSubjects = [];
+  const geSaveTimers = {};
 
-    if (!studentId || !subject) {
-      alert('Please fill required fields');
+  function buildGeGradeTabs() {
+    const container = document.getElementById('geGradeTabs');
+    const present = [...new Set(knownStudents.map(s => s.grade_level).filter(Boolean))]
+      .sort((a, b) => GRADE_LEVELS.indexOf(a) - GRADE_LEVELS.indexOf(b));
+
+    if (!present.includes(geGradeLevel)) geGradeLevel = present[0] || '';
+
+    container.innerHTML = present.map(t =>
+      `<button class="tab-btn ${t === geGradeLevel ? 'active' : ''}" data-level="${t}">${t}</button>`
+    ).join('');
+    container.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        geGradeLevel = btn.dataset.level;
+        container.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadGeSubjects();
+      });
+    });
+
+    const activeQuarter = quarters.find(q => q.id === activeQuarterId);
+    document.getElementById('geQuarterPill').textContent = activeQuarter ? quarterShortOrdinal(activeQuarter) : '—';
+
+    if (geGradeLevel) {
+      loadGeSubjects();
+    } else {
+      document.getElementById('geCardTitle').textContent = 'No active students yet';
+      document.getElementById('geCardSubtitle').textContent = '';
+      document.getElementById('geTableWrap').innerHTML = '';
+    }
+  }
+
+  async function loadGeSubjects() {
+    try {
+      const response = await fetch(`${API_BASE}/admin/subjects?gradeLevel=${encodeURIComponent(geGradeLevel)}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      geSubjects = await response.json();
+
+      const select = document.getElementById('geSubjectSelect');
+      if (!response.ok || !Array.isArray(geSubjects) || geSubjects.length === 0) {
+        select.innerHTML = '<option value="">No subjects set up</option>';
+        document.getElementById('geTableWrap').innerHTML = '';
+        document.getElementById('geCardTitle').textContent = `No subjects set up for ${geGradeLevel}`;
+        document.getElementById('geCardSubtitle').textContent = '';
+        return;
+      }
+
+      // Repopulate and reset to this level's first subject - never leaves a
+      // selection from the previous grade level's subject list active.
+      select.innerHTML = geSubjects.map(s => `<option value="${s.code}">${s.name}</option>`).join('');
+      loadGradeEntryTable();
+
+    } catch (error) {
+      console.error('Failed to load subjects:', error.message);
+    }
+  }
+
+  function gradeRemarkBadge(score) {
+    if (score === null || score === undefined || score === '') return '<span class="pill pill-gray">Not entered</span>';
+    const num = Number(score);
+    if (isNaN(num)) return '<span class="pill pill-gray">Not entered</span>';
+    if (num >= 90) return '<span class="pill pill-green">Outstanding</span>';
+    if (num >= 75) return '<span class="pill pill-gray">Passed</span>';
+    return '<span class="pill pill-red">Needs support</span>';
+  }
+
+  async function loadGradeEntryTable() {
+    const subjectCode = document.getElementById('geSubjectSelect').value;
+    if (!subjectCode || !activeQuarterId) return;
+
+    const subject = geSubjects.find(s => s.code === subjectCode);
+    const quarter = quarters.find(q => q.id === activeQuarterId);
+
+    document.getElementById('geCardTitle').textContent = `${subject ? subject.name : subjectCode} — ${geGradeLevel}`;
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/admin/grades?gradeLevel=${encodeURIComponent(geGradeLevel)}&subjectCode=${encodeURIComponent(subjectCode)}&quarterId=${activeQuarterId}`,
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
+      );
+      const rows = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to load grades:', rows.error);
+        return;
+      }
+
+      renderGeSubtitle(subject, rows, quarter);
+
+      const wrap = document.getElementById('geTableWrap');
+      if (rows.length === 0) {
+        wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No active students in ${geGradeLevel}.</td></tr></tbody></table>`;
+        return;
+      }
+
+      wrap.innerHTML = `
+        <table class="table">
+          <thead>
+            <tr><th>Student</th><th>Section</th><th>${quarter ? quarter.short : 'Q'} Grade</th><th>Remark</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr data-student-id="${r.student_id}">
+                <td><div class="avatar-name"><div class="avatar">${initials(r.name)}</div>${r.name}</div></td>
+                <td>${r.section || ''}</td>
+                <td>
+                  <input class="grade-input" type="number" min="60" max="100" step="1"
+                         value="${r.score !== null && r.score !== undefined ? r.score : ''}"
+                         oninput="handleGeGradeInput(this, ${r.student_id})"
+                         onblur="handleGeGradeBlur(this, ${r.student_id})" />
+                </td>
+                <td>
+                  <span class="remark-pill" id="geRemark${r.student_id}">${gradeRemarkBadge(r.score)}</span>
+                  <span class="saving-indicator hidden" id="geSaving${r.student_id}"></span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+    } catch (error) {
+      console.error('Failed to load grade entry table:', error.message);
+    }
+  }
+
+  function renderGeSubtitle(subject, rows, quarter) {
+    const entered = rows.filter(r => r.score !== null && r.score !== undefined).length;
+    const teacher = subject && subject.teacher_name ? `Taught by ${subject.teacher_name} · ` : '';
+    document.getElementById('geCardSubtitle').textContent = `${teacher}${entered}/${rows.length} entered for ${quarter ? quarter.short : ''}`;
+  }
+
+  // Whole numbers 60-100 only; blank clears the grade. Returns
+  // { valid, score } - score is null for an intentionally blank field.
+  function validateGeScore(inputEl) {
+    const raw = inputEl.value.trim();
+    if (raw === '') return { valid: true, score: null };
+    const num = Number(raw);
+    if (!Number.isInteger(num) || num < 60 || num > 100) return { valid: false, score: undefined };
+    return { valid: true, score: num };
+  }
+
+  // Live remark update on every keystroke; actual save is debounced ~800ms
+  // after typing stops so (student, subject, quarter) writes don't spam the
+  // server on every character.
+  function handleGeGradeInput(inputEl, studentId) {
+    const validation = validateGeScore(inputEl);
+    const remarkEl = document.getElementById(`geRemark${studentId}`);
+
+    clearTimeout(geSaveTimers[studentId]);
+
+    if (!validation.valid) {
+      inputEl.classList.add('input-error');
+      remarkEl.innerHTML = gradeRemarkBadge(null);
       return;
     }
 
+    inputEl.classList.remove('input-error');
+    remarkEl.innerHTML = gradeRemarkBadge(validation.score);
+    geSaveTimers[studentId] = setTimeout(() => saveGeScore(studentId, inputEl, validation.score), 800);
+  }
+
+  // Blur saves immediately (covers Tab-to-next-row before the debounce fires).
+  function handleGeGradeBlur(inputEl, studentId) {
+    clearTimeout(geSaveTimers[studentId]);
+    const validation = validateGeScore(inputEl);
+    if (!validation.valid) {
+      inputEl.classList.add('input-error');
+      return;
+    }
+    inputEl.classList.remove('input-error');
+    saveGeScore(studentId, inputEl, validation.score);
+  }
+
+  async function saveGeScore(studentId, inputEl, score) {
+    const subjectCode = document.getElementById('geSubjectSelect').value;
+    const indicator = document.getElementById(`geSaving${studentId}`);
+
+    if (indicator) {
+      indicator.textContent = 'Saving…';
+      indicator.classList.remove('hidden', 'is-saved');
+    }
+
     try {
-      const response = await fetch(`${API_BASE}/admin/grades`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ studentId, subject, q1, q2, q3, q4 })
+      const response = await fetch(`${API_BASE}/admin/grades/${studentId}/${activeQuarterId}/${encodeURIComponent(subjectCode)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ score })
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        document.getElementById('gradeSuccess').textContent = 'Grade saved successfully!';
-        document.getElementById('gradeSuccess').style.display = 'block';
-        setTimeout(() => { document.getElementById('gradeSuccess').style.display = 'none'; }, 3000);
+        if (indicator) {
+          indicator.textContent = '✓ Saved';
+          indicator.classList.add('is-saved');
+          setTimeout(() => indicator.classList.add('hidden'), 1500);
+        }
+        updateGeEnteredCount();
       } else {
-        alert('Error: ' + data.error);
+        if (indicator) { indicator.textContent = 'Error saving'; indicator.classList.remove('is-saved'); }
       }
     } catch (error) {
-      alert('Error: ' + error.message);
+      if (indicator) { indicator.textContent = 'Error saving'; indicator.classList.remove('is-saved'); }
+      console.error('Failed to save grade:', error.message);
     }
+  }
+
+  // Recomputes the "X/Y entered" subtitle from the table already on screen
+  // (no re-fetch) so Tab-based keyboard navigation between grade inputs is
+  // never interrupted by a full table re-render.
+  function updateGeEnteredCount() {
+    const inputs = document.querySelectorAll('#geTableWrap .grade-input');
+    if (inputs.length === 0) return;
+    const total = inputs.length;
+    const entered = Array.from(inputs).filter(el => el.value.trim() !== '' && !el.classList.contains('input-error')).length;
+    const subject = geSubjects.find(s => s.code === document.getElementById('geSubjectSelect').value);
+    const quarter = quarters.find(q => q.id === activeQuarterId);
+    const teacher = subject && subject.teacher_name ? `Taught by ${subject.teacher_name} · ` : '';
+    document.getElementById('geCardSubtitle').textContent = `${teacher}${entered}/${total} entered for ${quarter ? quarter.short : ''}`;
   }
 
   // Add Announcement
