@@ -550,7 +550,7 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
   
-  const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword, studentNumber, adviser } = req.body;
+  const { parentEmail, studentName, gradeLevel, section, parentName, parentPassword, studentNumber, adviser, parentPhone } = req.body;
 
   if (!studentNumber) {
     return res.status(400).json({ error: 'Student ID Number is required' });
@@ -561,10 +561,10 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
     // account, even if the email matches one already on file.
     const hashedPassword = await hashPassword(parentPassword);
     const createParent = await client.query(
-      `INSERT INTO users (school_id, name, email, password, role)
-       VALUES ($1, $2, $3, $4, 'parent')
+      `INSERT INTO users (school_id, name, email, password, phone, role)
+       VALUES ($1, $2, $3, $4, $5, 'parent')
        RETURNING id`,
-      [req.user.schoolId, parentName, parentEmail, hashedPassword]
+      [req.user.schoolId, parentName, parentEmail, hashedPassword, parentPhone || null]
     );
     const parentId = createParent.rows[0].id;
 
