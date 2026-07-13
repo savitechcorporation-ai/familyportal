@@ -431,6 +431,50 @@
     .btn-outline:hover { background: var(--surface); }
     .btn-sm { padding: 6px 12px; font-size: 11.5px; }
 
+    /* Remarks & Values */
+    .context-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+
+    .expand-card {
+      background: white; border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); margin-bottom: 12px; overflow: hidden;
+    }
+    .expand-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 18px; cursor: pointer;
+    }
+    .expand-header:hover { background: var(--surface); }
+    .expand-header .student-name { font-family: var(--font-display); font-weight: 700; color: var(--maroon); font-size: 14.5px; }
+    .expand-header .student-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .chevron { color: var(--muted); font-size: 12px; }
+
+    .expand-body { display: none; padding: 0 18px 18px; border-top: 1px solid var(--border); }
+    .expand-body.open { display: block; }
+
+    .field-label {
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--muted); margin: 16px 0 8px;
+    }
+
+    .remarks-textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-family: var(--font); font-size: 12.5px; min-height: 72px; resize: vertical; color: var(--ink);
+    }
+    .remarks-textarea:focus { outline: none; border-color: var(--maroon); }
+
+    .values-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .value-field label { display: block; font-size: 12px; color: var(--slate); margin-bottom: 6px; }
+    .value-field select {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12.5px;
+    }
+
+    .values-legend { font-size: 10.5px; color: var(--muted); margin-top: 12px; }
+
+    .saved-indicator { font-size: 12px; color: var(--success); font-weight: 600; }
+
+    @media (max-width: 700px) {
+      .values-grid { grid-template-columns: 1fr; }
+    }
+
     .table-scroll { overflow-x: auto; }
 
     .hidden { display: none !important; }
@@ -503,6 +547,7 @@
       <li><button class="menu-btn active" data-section="overview">📈 Overview</button></li>
       <li><button class="menu-btn" data-section="students">👥 Students</button></li>
       <li><button class="menu-btn" data-section="grades">📊 Grades</button></li>
+      <li><button class="menu-btn" data-section="remarks">💬 Remarks &amp; Values</button></li>
       <li><button class="menu-btn" data-section="announcements">📢 Announcements</button></li>
       <li><button class="menu-btn" data-section="checkedsync">🔄 CheckEd Sync</button></li>
     </ul>
@@ -716,6 +761,15 @@
         </div>
       </div>
 
+      <!-- REMARKS & VALUES SECTION -->
+      <div id="remarksSection" class="section">
+        <div class="context-row">
+          <span class="pill pill-maroon" id="rvQuarterPill">—</span>
+          <span style="color:var(--muted); font-size:12.5px;">Click a student to expand and edit</span>
+        </div>
+        <div id="rvList"></div>
+      </div>
+
       <!-- ANNOUNCEMENTS SECTION -->
       <div id="announcementsSection" class="section">
         <div class="success-msg" id="announcementSuccess"></div>
@@ -804,6 +858,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const API_BASE = 'https://familyportal.onrender.com/api';
   const ORDINALS = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
   const GRADE_LEVELS = ['Preschool','Kinder 1','Kinder 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
+  const CORE_VALUES = [
+    { key: 'Maka-Diyos', label: 'Maka-Diyos', hint: 'Reflects spiritual values' },
+    { key: 'Makatao', label: 'Makatao', hint: 'Demonstrates concern for others' },
+    { key: 'Makakalikasan', label: 'Makakalikasan', hint: 'Cares for the environment' },
+    { key: 'Makabansa', label: 'Makabansa', hint: 'Demonstrates pride in being a Filipino' }
+  ];
   let authToken = null;
   let schoolId = null;
   let knownStudents = [];
@@ -811,6 +871,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let activeQuarterId = null;
   let studentGradeLevelFilter = '';
   let addStudentFormOpen = false;
+  let expandedStudentId = null;
 
   const DEFAULT_SUBJECTS = [
     'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan',
@@ -873,6 +934,7 @@ window.addEventListener('DOMContentLoaded', () => {
         overview: ['Overview', 'School-wide snapshot'],
         students: ['Students', 'Manage enrollment and profiles'],
         grades: ['Grades', 'Add and update student quarterly grades'],
+        remarks: ['Remarks & Values', "Adviser comments and core values ratings"],
         announcements: ['Announcements', 'Post updates for parents'],
         checkedsync: ['CheckEd Sync', 'Sync attendance from CheckEd']
       };
@@ -881,6 +943,7 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('sectionSubtitle').textContent = subtitle;
 
       if (btn.dataset.section === 'overview') loadOverview();
+      if (btn.dataset.section === 'remarks') loadRemarksValues();
     });
   });
 
@@ -979,6 +1042,137 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function initials(name) {
     return (name || '').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
+  }
+
+  // Free text (remarks) round-trips to the parent portal, so it must be
+  // escaped before going into innerHTML - never trust it as raw markup.
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  // ---------- Remarks & Values ----------
+  async function loadRemarksValues() {
+    if (!activeQuarterId) return;
+
+    const q = quarters.find(qq => qq.id === activeQuarterId);
+    document.getElementById('rvQuarterPill').textContent = q ? quarterShortOrdinal(q) : '—';
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/remarks-values?quarterId=${activeQuarterId}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const students = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to load remarks & values:', students.error);
+        return;
+      }
+
+      const list = document.getElementById('rvList');
+
+      if (students.length === 0) {
+        list.innerHTML = `<div class="card" style="text-align:center; padding:44px 20px; color:var(--muted); font-size:13px;">No active students yet — add students first.</div>`;
+        return;
+      }
+
+      if (expandedStudentId === null || !students.some(s => s.id === expandedStudentId)) {
+        expandedStudentId = students[0].id;
+      }
+
+      list.innerHTML = students.map(s => `
+        <div class="expand-card" data-student-id="${s.id}">
+          <div class="expand-header" onclick="toggleRvCard(${s.id})">
+            <div class="avatar-name">
+              <div class="avatar">${initials(s.name)}</div>
+              <div>
+                <div class="student-name">${escapeHtml(s.name)}</div>
+                <div class="student-meta">${escapeHtml(s.grade_level || '')}${s.section ? ' — ' + escapeHtml(s.section) : ''}</div>
+              </div>
+            </div>
+            <span class="chevron" id="rvChevron${s.id}">${s.id === expandedStudentId ? '▲' : '▼'}</span>
+          </div>
+          <div class="expand-body ${s.id === expandedStudentId ? 'open' : ''}" id="rvBody${s.id}">
+            <div class="field-label">Adviser's Remarks</div>
+            <textarea class="remarks-textarea" id="rvRemarks${s.id}" placeholder="Write a comment for the parent…">${escapeHtml(s.remarks || '')}</textarea>
+
+            <div class="field-label">Core Values Rating</div>
+            <div class="values-grid">
+              ${CORE_VALUES.map(cv => `
+                <div class="value-field">
+                  <label>${cv.label} (${cv.hint})</label>
+                  <select id="rvValue${s.id}_${cv.key}">
+                    <option value="AO" ${(s.values[cv.key] || 'AO') === 'AO' ? 'selected' : ''}>AO</option>
+                    <option value="SO" ${s.values[cv.key] === 'SO' ? 'selected' : ''}>SO</option>
+                    <option value="RO" ${s.values[cv.key] === 'RO' ? 'selected' : ''}>RO</option>
+                    <option value="NO" ${s.values[cv.key] === 'NO' ? 'selected' : ''}>NO</option>
+                  </select>
+                </div>
+              `).join('')}
+            </div>
+            <div class="values-legend">AO = Always Observed · SO = Sometimes · RO = Rarely · NO = Not Observed</div>
+
+            <div style="display:flex; align-items:center; gap:12px; margin-top:14px;">
+              <button class="btn btn-primary btn-sm" onclick="saveRemarksValues(${s.id})">Save Remarks &amp; Ratings</button>
+              <span class="saved-indicator hidden" id="rvSaved${s.id}">✓ Saved</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+    } catch (error) {
+      console.error('Failed to load remarks & values:', error.message);
+    }
+  }
+
+  // Only one card open at a time; clicking the open one collapses it.
+  function toggleRvCard(studentId) {
+    const wasOpen = expandedStudentId === studentId;
+
+    document.querySelectorAll('.expand-body').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.chevron').forEach(el => el.textContent = '▼');
+
+    if (wasOpen) {
+      expandedStudentId = null;
+    } else {
+      expandedStudentId = studentId;
+      document.getElementById(`rvBody${studentId}`).classList.add('open');
+      document.getElementById(`rvChevron${studentId}`).textContent = '▲';
+    }
+  }
+
+  async function saveRemarksValues(studentId) {
+    const body = document.getElementById(`rvRemarks${studentId}`).value;
+    const values = {};
+    CORE_VALUES.forEach(cv => {
+      values[cv.key] = document.getElementById(`rvValue${studentId}_${cv.key}`).value;
+    });
+
+    try {
+      const [remarksRes, valuesRes] = await Promise.all([
+        fetch(`${API_BASE}/admin/remarks/${studentId}/${activeQuarterId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ body })
+        }),
+        fetch(`${API_BASE}/admin/values/${studentId}/${activeQuarterId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ values })
+        })
+      ]);
+
+      if (remarksRes.ok && valuesRes.ok) {
+        const savedEl = document.getElementById(`rvSaved${studentId}`);
+        savedEl.classList.remove('hidden');
+        setTimeout(() => savedEl.classList.add('hidden'), 2000);
+      } else {
+        alert('Error saving remarks/values');
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
   }
 
   // Client-side search + grade-level filter over the already-loaded list
@@ -1123,6 +1317,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (q) document.getElementById('yearBadge').textContent = `S.Y. ${q.school_year}`;
     loadOverview();
     loadStudents();
+    expandedStudentId = null; // switching quarters resets which card is auto-expanded
+    if (document.getElementById('remarksSection').classList.contains('active')) loadRemarksValues();
   }
 
   // Load the Overview page's stats for the selected quarter - always
@@ -1415,6 +1611,7 @@ window.addEventListener('DOMContentLoaded', () => {
     schoolId = null;
     quarters = [];
     activeQuarterId = null;
+    expandedStudentId = null;
     document.getElementById('adminScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('adminEmail').value = '';
