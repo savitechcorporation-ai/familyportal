@@ -261,7 +261,8 @@ app.post('/api/login', async (req, res) => {
     // is scoped to.
     const userResult = await client.query(
       `SELECT u.id, u.school_id, u.email, u.password, u.role, u.name, s.name AS school_name,
-              st.id AS student_id, st.name AS student_name, st.grade_level, st.section, st.photo
+              st.id AS student_id, st.name AS student_name, st.grade_level, st.section, st.photo,
+              st.student_number, st.adviser
        FROM users u
        JOIN schools s ON u.school_id = s.id
        LEFT JOIN students st ON st.parent_id = u.id
@@ -284,7 +285,11 @@ app.post('/api/login', async (req, res) => {
     const token = generateToken(user);
 
     const students = (user.role === 'parent' && user.student_id)
-      ? [{ id: user.student_id, name: user.student_name, grade_level: user.grade_level, section: user.section, photo: user.photo }]
+      ? [{
+          id: user.student_id, name: user.student_name, grade_level: user.grade_level,
+          section: user.section, photo: user.photo, student_number: user.student_number,
+          adviser: user.adviser
+        }]
       : [];
 
     res.json({
@@ -805,6 +810,33 @@ app.get('/api/admin/overview', verifyToken, async (req, res) => {
         attendanceRate: r.rate !== null ? Math.round(parseFloat(r.rate) * 10000) / 100 : null
       }))
     });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET SUBJECTS for a grade level - any authenticated role (admin, teacher,
+// parent). Subject names/codes aren't sensitive per-student data, just the
+// school's course list, and parents need the full list (not only subjects
+// that already have a grade row) to render a complete grades table on the
+// Overview page. Scoped to the caller's own school_id.
+app.get('/api/subjects', verifyToken, async (req, res) => {
+  const { gradeLevel } = req.query;
+  if (!gradeLevel) {
+    return res.status(400).json({ error: 'gradeLevel is required' });
+  }
+
+  try {
+    const subjects = await client.query(
+      `SELECT code, name
+       FROM subjects
+       WHERE school_id = $1 AND grade_level = $2
+       ORDER BY name ASC`,
+      [req.user.schoolId, gradeLevel]
+    );
+
+    res.json(subjects.rows);
 
   } catch (err) {
     res.status(500).json({ error: err.message });

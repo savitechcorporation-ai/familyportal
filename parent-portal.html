@@ -69,6 +69,32 @@
 
     .remarks-text { font-size: 13px; color: var(--slate); line-height: 1.7; }
 
+    /* ---------- Overview page ---------- */
+    .child-header-card { background: var(--maroon-light); border-color: transparent; margin-bottom: 20px; }
+    .child-header-body { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .avatar-lg { width: 56px; height: 56px; font-size: 18px; flex-shrink: 0; }
+    .child-header-name { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--maroon-dark); }
+    .child-header-meta { font-size: 12.5px; color: var(--maroon-dark); opacity: 0.75; margin-top: 4px; }
+
+    .overview-error-banner {
+      color: var(--danger); font-size: 13px; padding: 10px 14px; background: var(--danger-bg);
+      border-radius: var(--radius-sm); margin-bottom: 16px;
+    }
+
+    .trend-chart { display: flex; align-items: flex-end; gap: 14px; height: 180px; padding: 10px 4px 0; }
+    .trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
+    .trend-bar-value { font-size: 12px; font-weight: 700; color: var(--maroon); font-family: var(--font-mono); margin-bottom: 6px; }
+    .trend-bar-track {
+      flex: 1; width: 100%; max-width: 52px; display: flex; align-items: flex-end;
+      background: var(--surface); border-radius: 6px 6px 0 0; overflow: hidden;
+    }
+    .trend-bar-fill { width: 100%; border-radius: 6px 6px 0 0; }
+    .trend-bar-label { font-size: 11px; color: var(--muted); margin-top: 8px; font-weight: 600; }
+
+    @media (max-width: 900px) {
+      .child-header-body { text-align: center; justify-content: center; }
+    }
+
     /* ---------- Mobile shell (<900px): sidebar becomes a top app bar ---------- */
     .mobile-menu-toggle {
       display: none;
@@ -207,15 +233,50 @@
     <div class="content">
       <!-- OVERVIEW PAGE -->
       <div id="overviewSection" class="section active">
-        <div class="stat-row" id="overviewStatRow"></div>
-        <div class="two-col">
-          <div class="card">
-            <div class="card-header">
-              <h3>Subjects at a Glance</h3>
-              <div class="card-subtitle" id="overviewSubjectsSubtitle">Latest quarter grades</div>
+        <div class="card child-header-card">
+          <div class="card-body child-header-body">
+            <div class="avatar avatar-lg" id="childAvatar"></div>
+            <div>
+              <div class="child-header-name" id="childHeaderName"></div>
+              <div class="child-header-meta" id="childHeaderMeta"></div>
             </div>
-            <div class="card-body table-scroll" style="padding:0;" id="overviewSubjectsWrap"></div>
           </div>
+        </div>
+
+        <div class="overview-error-banner hidden" id="overviewError">Some information may be out of date — we couldn't reach the server just now.</div>
+        <div class="empty-msg hidden" id="overviewLoading">Loading overview…</div>
+        <div class="placeholder-card hidden" id="overviewEmpty">Grades will appear here once the school releases them.</div>
+
+        <div id="overviewContent">
+          <div class="stat-row" id="overviewStatRow"></div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-header">
+                <h3>General Average — Quarter by Quarter</h3>
+                <div class="card-subtitle">Released quarters only</div>
+              </div>
+              <div class="card-body">
+                <div id="trendChartWrap"></div>
+                <div id="trendLine" style="margin-top:12px; font-size:12.5px; font-weight:600;"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h3 id="gradesSoFarTitle">Grades So Far</h3>
+                <div class="card-subtitle" id="gradesSoFarSubtitle"></div>
+              </div>
+              <div class="card-body table-scroll" style="padding:0;" id="gradesSoFarWrap"></div>
+            </div>
+          </div>
+
+          <div class="card hidden" id="remarksOverviewCard">
+            <div class="card-header">
+              <h3 id="remarksOverviewTitle">Teacher's Remarks</h3>
+            </div>
+            <div class="card-body" id="remarksOverviewBody"></div>
+          </div>
+
           <div class="card">
             <div class="card-header">
               <h3>Announcements</h3>
@@ -295,9 +356,11 @@
   let childGrades = [];
   let childAttendance = [];
   let childQuarters = [];       // released quarters only, from /api/remarks-values (server-side gated)
+  let childSubjects = [];       // full subject list for the child's grade level, from /api/subjects
   let activeQuarterShort = null;
   let activeQuarterLabel = null;
   let cachedAnnouncements = [];
+  let lastFetchHadError = false;
 
   const PAGE_TITLES = {
     overview: { title: 'Overview', subtitle: "A quick summary of your child's performance" },
@@ -311,6 +374,10 @@
     const div = document.createElement('div');
     div.textContent = str === null || str === undefined ? '' : String(str);
     return div.innerHTML;
+  }
+
+  function initials(name) {
+    return (name || '').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
   }
 
   // ---------- Branding (white-label) ----------
@@ -544,15 +611,22 @@
 
   // ---------- Per-child data loading ----------
   async function loadChildData(studentId) {
-    const [grades, attendance, remarksValues] = await Promise.all([
+    showOverviewLoading();
+    lastFetchHadError = false;
+
+    const child = children.find(c => c.id === studentId);
+
+    const [grades, attendance, remarksValues, subjects] = await Promise.all([
       fetchGrades(studentId),
       fetchAttendance(studentId),
-      fetchRemarksValues(studentId)
+      fetchRemarksValues(studentId),
+      fetchSubjects(child ? child.grade_level : null)
     ]);
 
     childGrades = grades;
     childAttendance = attendance;
     childQuarters = remarksValues;
+    childSubjects = subjects;
 
     if (childQuarters.length > 0) {
       const latest = childQuarters[childQuarters.length - 1];
@@ -567,15 +641,24 @@
     renderActivePage();
   }
 
+  function showOverviewLoading() {
+    document.getElementById('overviewLoading').classList.remove('hidden');
+    document.getElementById('overviewContent').classList.add('hidden');
+    document.getElementById('overviewEmpty').classList.add('hidden');
+    document.getElementById('overviewError').classList.add('hidden');
+  }
+
   async function fetchGrades(studentId) {
     try {
       const response = await fetch(`${API_BASE}/grades/${studentId}?schoolYear=${SCHOOL_YEAR}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
+      if (!response.ok) lastFetchHadError = true;
       return response.ok && Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Failed to load grades:', error.message);
+      lastFetchHadError = true;
       return [];
     }
   }
@@ -586,9 +669,11 @@
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
+      if (!response.ok) lastFetchHadError = true;
       return response.ok && Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Failed to load attendance:', error.message);
+      lastFetchHadError = true;
       return [];
     }
   }
@@ -599,9 +684,27 @@
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
+      if (!response.ok) lastFetchHadError = true;
       return response.ok && Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Failed to load remarks & values:', error.message);
+      lastFetchHadError = true;
+      return [];
+    }
+  }
+
+  async function fetchSubjects(gradeLevel) {
+    if (!gradeLevel) return [];
+    try {
+      const response = await fetch(`${API_BASE}/subjects?gradeLevel=${encodeURIComponent(gradeLevel)}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      if (!response.ok) lastFetchHadError = true;
+      return response.ok && Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('Failed to load subjects:', error.message);
+      lastFetchHadError = true;
       return [];
     }
   }
@@ -644,8 +747,11 @@
     return '<span class="pill pill-red">Needs support</span>';
   }
 
-  function computeQuarterAverage() {
-    const num = quarterNumber(activeQuarterShort);
+  // short defaults to the global quarter-selector state (used by the
+  // Grades/Attendance pages); Overview passes an explicit quarter (always
+  // the latest released one) so it stays independent of that selector.
+  function computeQuarterAverage(short) {
+    const num = quarterNumber(short || activeQuarterShort);
     if (!num) return null;
     const graded = childGrades
       .map(g => g['q' + num])
@@ -663,17 +769,27 @@
     return '<div class="empty-msg">Not currently on the honor roll for this quarter.</div>';
   }
 
-  function attendanceRecordForActiveQuarter() {
-    return childAttendance.find(a => a.month === activeQuarterShort) || null;
+  // DepEd Order 36, s. 2016 honors descriptor - null (no descriptor) below 90.
+  function depedHonorsDescriptor(average) {
+    if (average === null || average === undefined) return null;
+    if (average >= 98) return 'With Highest Honors';
+    if (average >= 95) return 'With High Honors';
+    if (average >= 90) return 'With Honors';
+    return null;
   }
 
-  function attendanceRateInfo() {
-    const rec = attendanceRecordForActiveQuarter();
+  function attendanceRecordFor(short) {
+    return childAttendance.find(a => a.month === (short || activeQuarterShort)) || null;
+  }
+
+  function attendanceRateInfo(short) {
+    const rec = attendanceRecordFor(short);
     const present = rec ? Number(rec.present_days) || 0 : 0;
+    const absent = rec ? Number(rec.absent_days) || 0 : 0;
+    const tardy = rec ? Number(rec.tardy_days) || 0 : 0;
     const schoolDays = rec ? Number(rec.school_days) || 0 : 0;
-    if (!rec || !schoolDays) return { rate: null, present, absent: rec ? Number(rec.absent_days) || 0 : 0, tardy: rec ? Number(rec.tardy_days) || 0 : 0 };
-    const rate = Math.round((present / schoolDays) * 1000) / 10;
-    return { rate, present, absent: Number(rec.absent_days) || 0, tardy: Number(rec.tardy_days) || 0 };
+    const rate = (rec && schoolDays) ? Math.round((present / schoolDays) * 1000) / 10 : null;
+    return { rate, present, absent, tardy, schoolDays };
   }
 
   function rateBadge(rate) {
@@ -684,58 +800,230 @@
   }
 
   // ---------- Overview ----------
+  //
+  // PROVISIONAL-DATA POLICY: this app's backend hides in-progress-quarter
+  // grades/attendance/remarks from parents entirely (verified in
+  // /api/grades, /api/attendance, /api/remarks-values - each filters to
+  // q.status = 'released' for role='parent' with no exception). There is no
+  // "so far, provisional" data ever available to show. So every element of
+  // this page that would have shown current-quarter-in-progress data
+  // instead reads from the latest RELEASED quarter:
+  //   - "Overall Average" stat card (was "{Current Q} Average (So Far)")
+  //     is the average of the child's general average across every
+  //     released quarter this year, rather than a duplicate of the
+  //     "{Last Q} General Average" card next to it.
+  //   - "Attendance Rate" and "Subjects Needing Attention" stat cards read
+  //     the latest released quarter instead of "this quarter".
+  //   - The grades table is titled "{Last Released Q} — Grades" instead of
+  //     "{Current Q} — Grades So Far".
+  // The trend chart and Teacher's Remarks card were always released-only
+  // per the spec, so they're unaffected by this.
+
+  function latestReleasedQuarter() {
+    return childQuarters.length > 0 ? childQuarters[childQuarters.length - 1] : null;
+  }
+
+  function computeOverallAverage() {
+    const perQuarter = childQuarters.map(q => computeQuarterAverage(q.short)).filter(v => v !== null);
+    if (perQuarter.length === 0) return null;
+    return Math.round((perQuarter.reduce((sum, v) => sum + v, 0) / perQuarter.length) * 100) / 100;
+  }
+
+  function subjectsNeedingAttention(short) {
+    const num = quarterNumber(short);
+    if (!num) return [];
+    return childGrades.filter(g => {
+      const v = g['q' + num];
+      return v !== null && v !== undefined && parseFloat(v) < 85;
+    });
+  }
+
+  function computeQuarterTrend() {
+    return childQuarters
+      .map(q => ({ short: q.short, label: q.quarter, value: computeQuarterAverage(q.short) }))
+      .filter(q => q.value !== null);
+  }
+
+  // DepEd descriptors for the Overview grades table (finer-grained than the
+  // 3-tier pill used on the Grades page, per this task's spec).
+  function depedRemarkBadge(score) {
+    if (score === null || score === undefined || score === '') return '<span class="pill pill-gray">—</span>';
+    const num = Number(score);
+    if (isNaN(num)) return '<span class="pill pill-gray">—</span>';
+    if (num >= 90) return '<span class="pill pill-green">Outstanding</span>';
+    if (num >= 85) return '<span class="pill pill-green">Very Satisfactory</span>';
+    if (num >= 80) return '<span class="pill pill-yellow">Satisfactory</span>';
+    if (num >= 75) return '<span class="pill pill-yellow">Fairly Satisfactory</span>';
+    return '<span class="pill pill-red">Did Not Meet Expectations</span>';
+  }
+
   function renderOverview() {
-    const avg = computeQuarterAverage();
-    const { rate, present, absent, tardy } = attendanceRateInfo();
-    const label = activeQuarterLabel || 'This quarter';
+    document.getElementById('overviewLoading').classList.add('hidden');
+
+    const child = children.find(c => c.id === activeStudentId);
+
+    document.getElementById('childAvatar').textContent = initials(child ? child.name : '');
+    document.getElementById('childHeaderName').textContent = child ? child.name : '';
+
+    const metaParts = [];
+    if (child) {
+      const gradeSection = [child.grade_level, child.section].filter(Boolean).join(' — ');
+      if (gradeSection) metaParts.push(gradeSection);
+      if (child.student_number) metaParts.push(`LRN: ${child.student_number}`);
+      if (child.adviser) metaParts.push(`Adviser: ${child.adviser}`);
+    }
+    document.getElementById('childHeaderMeta').textContent = metaParts.join(' · ');
+
+    document.getElementById('pageSubtitle').textContent = child
+      ? `A summary of your child's current standing — ${child.name}`
+      : PAGE_TITLES.overview.subtitle;
+
+    document.getElementById('overviewError').classList.toggle('hidden', !lastFetchHadError);
+
+    const latest = latestReleasedQuarter();
+    const emptyState = document.getElementById('overviewEmpty');
+    const content = document.getElementById('overviewContent');
+
+    if (!latest) {
+      emptyState.classList.remove('hidden');
+      content.classList.add('hidden');
+      return;
+    }
+    emptyState.classList.add('hidden');
+    content.classList.remove('hidden');
+
+    const overallAvg = computeOverallAverage();
+    const releasedCount = childQuarters.filter(q => computeQuarterAverage(q.short) !== null).length;
+    const lastQAvg = computeQuarterAverage(latest.short);
+    const honors = depedHonorsDescriptor(lastQAvg);
+    const { rate, present, schoolDays } = attendanceRateInfo(latest.short);
+    const attention = subjectsNeedingAttention(latest.short);
 
     document.getElementById('overviewStatRow').innerHTML = `
       <div class="stat-card">
-        <div class="stat-label">${label} Average</div>
-        <div class="stat-value">${avg !== null ? avg : '—'}</div>
-        <div class="stat-caption">${avg !== null ? gradeRemarkBadge(avg).replace(/<[^>]+>/g, '') : 'No grades released yet'}</div>
+        <div class="stat-label">Overall Average</div>
+        <div class="stat-value">${overallAvg !== null ? overallAvg : '—'}</div>
+        <div class="stat-caption">Across ${releasedCount} released quarter${releasedCount === 1 ? '' : 's'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Present</div>
-        <div class="stat-value">${present}</div>
-        <div class="stat-caption">Days present</div>
+        <div class="stat-label">${escapeHtml(latest.quarter)} General Average</div>
+        <div class="stat-value">${lastQAvg !== null ? lastQAvg : '—'}</div>
+        <div class="stat-caption">${honors || 'General average'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Absent</div>
-        <div class="stat-value">${absent}</div>
-        <div class="stat-caption">Days absent</div>
+        <div class="stat-label">Attendance Rate (${escapeHtml(latest.short)})</div>
+        <div class="stat-value">${rate !== null ? rate + '%' : '—'}</div>
+        <div class="stat-caption">${schoolDays > 0 ? `${present}/${schoolDays} days present` : 'No attendance data yet'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Tardy</div>
-        <div class="stat-value">${tardy}</div>
-        <div class="stat-caption">Days tardy</div>
+        <div class="stat-label">Subjects Needing Attention</div>
+        <div class="stat-value" style="color:${attention.length > 0 ? 'var(--warning)' : 'var(--success)'};">${attention.length}</div>
+        <div class="stat-caption">Below 85 in ${escapeHtml(latest.short)}</div>
       </div>
     `;
 
-    document.getElementById('overviewSubjectsSubtitle').textContent = `${label} grades`;
+    renderTrendChart(computeQuarterTrend());
+    renderGradesSoFar(latest);
+    renderTeacherRemarks();
+  }
 
-    const wrap = document.getElementById('overviewSubjectsWrap');
-    if (!activeQuarterShort || childGrades.length === 0) {
-      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No grades released yet.</td></tr></tbody></table>`;
+  function renderTrendChart(trend) {
+    const wrap = document.getElementById('trendChartWrap');
+    const trendLine = document.getElementById('trendLine');
+
+    if (trend.length === 0) {
+      wrap.innerHTML = `<div class="empty-msg">Grades will appear here once the school releases them.</div>`;
+      trendLine.innerHTML = '';
       return;
     }
 
-    const num = quarterNumber(activeQuarterShort);
-    const rows = childGrades.map(g => ({ subject: g.subject, score: g['q' + num] }));
+    const primary = getComputedStyle(document.documentElement).getPropertyValue('--maroon').trim() || '#6B1E2E';
+    const min = 60, max = 100, n = trend.length;
+
+    wrap.innerHTML = `
+      <div class="trend-chart">
+        ${trend.map((q, i) => {
+          const pct = Math.max(8, Math.min(100, ((q.value - min) / (max - min)) * 100));
+          const color = tintHex(primary, Math.min((n - 1 - i) * 0.16, 0.62));
+          return `
+            <div class="trend-bar-col">
+              <div class="trend-bar-value">${q.value}</div>
+              <div class="trend-bar-track">
+                <div class="trend-bar-fill" style="height:${pct}%; background:${color};"></div>
+              </div>
+              <div class="trend-bar-label">${escapeHtml(q.short)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    if (trend.length >= 2) {
+      const last = trend[trend.length - 1].value;
+      const prev = trend[trend.length - 2].value;
+      if (last > prev) trendLine.innerHTML = `<span style="color:var(--success);">▲ Trending upward vs. last quarter</span>`;
+      else if (last < prev) trendLine.innerHTML = `<span style="color:var(--danger);">▼ Trending downward vs. last quarter</span>`;
+      else trendLine.innerHTML = `<span style="color:var(--muted);">— Steady vs. last quarter</span>`;
+    } else {
+      trendLine.innerHTML = '';
+    }
+  }
+
+  function renderGradesSoFar(latest) {
+    document.getElementById('gradesSoFarTitle').textContent = `${latest.quarter} — Grades`;
+    document.getElementById('gradesSoFarSubtitle').textContent = `For ${latest.quarter}`;
+
+    const wrap = document.getElementById('gradesSoFarWrap');
+    if (childSubjects.length === 0) {
+      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No subjects set up for this grade level yet.</td></tr></tbody></table>`;
+      return;
+    }
+
+    const num = quarterNumber(latest.short);
+    const gradesByCode = {};
+    childGrades.forEach(g => { gradesByCode[g.subject] = g['q' + num]; });
 
     wrap.innerHTML = `
       <table class="table">
-        <thead><tr><th>Subject</th><th>Grade</th><th>Remark</th></tr></thead>
+        <thead><tr><th>Subject</th><th>Grade</th><th>Remarks</th></tr></thead>
         <tbody>
-          ${rows.map(r => `
-            <tr>
-              <td>${escapeHtml(r.subject)}</td>
-              <td class="mono">${r.score !== null && r.score !== undefined ? r.score : '—'}</td>
-              <td>${gradeRemarkBadge(r.score)}</td>
-            </tr>
-          `).join('')}
+          ${childSubjects.map(s => {
+            const score = gradesByCode[s.code];
+            return `
+              <tr>
+                <td>${escapeHtml(s.name)}</td>
+                <td class="mono">${score !== null && score !== undefined ? score : '—'}</td>
+                <td>${depedRemarkBadge(score)}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
+    `;
+  }
+
+  function renderTeacherRemarks() {
+    const card = document.getElementById('remarksOverviewCard');
+
+    let found = null;
+    for (let i = childQuarters.length - 1; i >= 0; i--) {
+      if (childQuarters[i].remarks) { found = childQuarters[i]; break; }
+    }
+
+    if (!found) {
+      card.classList.add('hidden');
+      return;
+    }
+
+    card.classList.remove('hidden');
+    document.getElementById('remarksOverviewTitle').textContent = `Teacher's Remarks — ${found.quarter}`;
+
+    const child = children.find(c => c.id === activeStudentId);
+    const adviser = child && child.adviser ? child.adviser : 'Adviser';
+
+    document.getElementById('remarksOverviewBody').innerHTML = `
+      <p class="remarks-text" style="font-style:italic;">“${escapeHtml(found.remarks)}”</p>
+      <div class="empty-msg" style="padding:8px 0 0;">— ${escapeHtml(adviser)}, Class Adviser</div>
     `;
   }
 
