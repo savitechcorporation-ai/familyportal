@@ -44,12 +44,14 @@
     .parent-info { font-size: 12px; color: #e8c9cd; margin-bottom: 10px; line-height: 1.4; }
     .parent-info .parent-name { color: white; font-weight: 700; font-size: 13px; }
 
-    .honor-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-      color: var(--maroon-dark);
-      padding: 8px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 700; margin-top: 14px;
+    .honor-recognition-row {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--gold-light); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 10px;
     }
+    .honor-recognition-row:last-child { margin-bottom: 0; }
+    .honor-recognition-icon { font-size: 22px; flex-shrink: 0; }
+    .honor-recognition-descriptor { font-weight: 700; color: var(--maroon-dark); font-size: 13.5px; }
+    .honor-recognition-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
     .announcement { padding: 14px 0; border-bottom: 1px solid #f1ece1; }
     .announcement:last-child { border-bottom: none; }
@@ -300,8 +302,8 @@
         <li><button class="menu-btn active" data-page="overview">📈 Overview</button></li>
         <li><button class="menu-btn" data-page="grades">📝 Grades</button></li>
         <li><button class="menu-btn" data-page="reportcards">📄 Report Cards</button></li>
-        <li><button class="menu-btn" data-page="attendance">🗓️ Attendance &amp; Honors</button></li>
         <li><button class="menu-btn" data-page="remarks">💬 Remarks &amp; Values</button></li>
+        <li><button class="menu-btn" data-page="attendance">🗓️ Attendance &amp; Honors</button></li>
       </ul>
 
       <div class="sidebar-footer">
@@ -398,13 +400,26 @@
 
       <!-- ATTENDANCE & HONORS PAGE -->
       <div id="attendanceSection" class="section hidden">
+        <div class="empty-msg hidden" id="attendanceLoading">Loading attendance…</div>
+        <div class="overview-error-banner hidden" id="attendanceError">Some information may be out of date — we couldn't reach the server just now.</div>
+
         <div class="stat-row" id="attendanceStatRow"></div>
-        <div class="card">
-          <div class="card-header">
-            <h3>Honor Roll Status</h3>
-            <div class="card-subtitle" id="honorCardSubtitle">Based on this quarter's average</div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <h3>Attendance by Quarter</h3>
+              <div class="card-subtitle">Released quarters only</div>
+            </div>
+            <div class="card-body table-scroll" style="padding:0;" id="attendanceByQuarterWrap"></div>
           </div>
-          <div class="card-body" id="honorBadgeWrap"></div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Honors &amp; Recognition</h3>
+              <div class="card-subtitle">Private view, visible only to you — not a published honor roll</div>
+            </div>
+            <div class="card-body" id="honorsRecognitionWrap"></div>
+          </div>
         </div>
       </div>
 
@@ -771,6 +786,7 @@
     showOverviewLoading();
     showGradesLoading();
     showReportCardLoading();
+    showAttendanceLoading();
     lastFetchHadError = false;
     expandedGradeSubject = null;
     reportCardQuarterShort = null;
@@ -822,6 +838,14 @@
     document.getElementById('rcEmpty').classList.add('hidden');
     document.getElementById('rcError').classList.add('hidden');
     document.getElementById('rcQuarterTabs').innerHTML = '';
+  }
+
+  function showAttendanceLoading() {
+    document.getElementById('attendanceLoading').classList.remove('hidden');
+    document.getElementById('attendanceError').classList.add('hidden');
+    document.getElementById('attendanceStatRow').innerHTML = '';
+    document.getElementById('attendanceByQuarterWrap').innerHTML = '';
+    document.getElementById('honorsRecognitionWrap').innerHTML = '';
   }
 
   async function fetchGrades(studentId) {
@@ -914,9 +938,12 @@
     if (activePage === 'reportcards') renderReportCardsPage();
   }
 
-  // short defaults to the global quarter-selector state (used by the
-  // Attendance page); Overview and Grades pass an explicit quarter so they
-  // stay independent of that selector.
+  // This is the ONE place the child's per-quarter general average is
+  // computed - Overview, Grades, Report Cards, and Attendance & Honors all
+  // call this same function (passing an explicit quarter short) rather
+  // than each recomputing it, so they can never disagree.
+  // short falls back to the global quarter-selector state when omitted
+  // (no page relies on that fallback anymore, but it's kept harmless).
   function computeQuarterAverage(short) {
     const num = quarterNumber(short || activeQuarterShort);
     if (!num) return null;
@@ -926,14 +953,6 @@
       .map(v => parseFloat(v));
     if (graded.length === 0) return null;
     return Math.round((graded.reduce((sum, v) => sum + v, 0) / graded.length) * 100) / 100;
-  }
-
-  function honorBadgeHtml(average) {
-    if (average === null) return '<div class="empty-msg">No honor roll standing yet for this quarter.</div>';
-    if (average >= 98) return '<div class="honor-badge">🏅 With Highest Honors</div>';
-    if (average >= 95) return '<div class="honor-badge">🏅 With High Honors</div>';
-    if (average >= 90) return '<div class="honor-badge">🏅 With Honors</div>';
-    return '<div class="empty-msg">Not currently on the honor roll for this quarter.</div>';
   }
 
   // DepEd Order 36, s. 2016 honors descriptor - null (no descriptor) below 90.
@@ -1334,43 +1353,126 @@
   }
 
   // ---------- Attendance & Honors ----------
+  //
+  // Year-wide, not single-quarter: iterates childQuarters (RELEASED
+  // quarters only - the same list Overview/Grades/Report Cards already use,
+  // sourced from /api/remarks-values which is release-gated server-side for
+  // the parent role with no in-progress exception). That's also the
+  // Overview page's established policy for "current quarter" data, so this
+  // page follows it automatically rather than re-deciding it.
+
+  function yearToDateAttendanceTotals() {
+    return childQuarters.reduce((acc, q) => {
+      const rec = attendanceRecordFor(q.short);
+      if (rec) {
+        acc.present += Number(rec.present_days) || 0;
+        acc.absent += Number(rec.absent_days) || 0;
+        acc.tardy += Number(rec.tardy_days) || 0;
+        acc.schoolDays += Number(rec.school_days) || 0;
+      }
+      return acc;
+    }, { present: 0, absent: 0, tardy: 0, schoolDays: 0 });
+  }
+
+  // Same computeQuarterAverage()/depedHonorsDescriptor() the Report Cards
+  // page uses for its General Average row and honors descriptor - not a
+  // separate computation, so the two pages can never disagree.
+  function computeHonorsQuarters() {
+    return childQuarters
+      .map(q => ({ quarter: q, average: computeQuarterAverage(q.short) }))
+      .map(item => ({ ...item, descriptor: depedHonorsDescriptor(item.average) }))
+      .filter(item => item.descriptor !== null);
+  }
+
   function renderAttendance() {
-    const label = activeQuarterLabel || 'this quarter';
+    document.getElementById('attendanceLoading').classList.add('hidden');
+    document.getElementById('attendanceError').classList.toggle('hidden', !lastFetchHadError);
 
-    if (!activeQuarterShort) {
-      document.getElementById('attendanceStatRow').innerHTML = `<div class="empty-msg">No attendance released yet.</div>`;
-      document.getElementById('honorBadgeWrap').innerHTML = honorBadgeHtml(null);
-      document.getElementById('honorCardSubtitle').textContent = 'Based on this quarter\'s average';
-      return;
-    }
+    const child = children.find(c => c.id === activeStudentId);
+    document.getElementById('pageSubtitle').textContent = child
+      ? `Attendance record and academic recognition — ${child.name}`
+      : PAGE_TITLES.attendance.subtitle;
 
-    const { rate, present, absent, tardy } = attendanceRateInfo();
+    const hasAnyReleased = childQuarters.length > 0;
+    const totals = yearToDateAttendanceTotals();
+    const yearRate = totals.schoolDays > 0 ? Math.round((totals.present / totals.schoolDays) * 1000) / 10 : null;
+    const honorsQuarters = computeHonorsQuarters();
 
     document.getElementById('attendanceStatRow').innerHTML = `
       <div class="stat-card">
-        <div class="stat-label">Present</div>
-        <div class="stat-value">${present}</div>
-        <div class="stat-caption">Days present in ${label}</div>
+        <div class="stat-label">Year-to-Date Attendance Rate</div>
+        <div class="stat-value">${yearRate !== null ? yearRate + '%' : '—'}</div>
+        <div class="stat-caption">${totals.schoolDays > 0 ? `${totals.present}/${totals.schoolDays} school days` : 'No attendance data yet'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Absent</div>
-        <div class="stat-value">${absent}</div>
-        <div class="stat-caption">Days absent in ${label}</div>
+        <div class="stat-label">Total Absences</div>
+        <div class="stat-value">${hasAnyReleased ? totals.absent : '—'}</div>
+        <div class="stat-caption">Across released quarters</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Tardy</div>
-        <div class="stat-value">${tardy}</div>
-        <div class="stat-caption">Days tardy in ${label}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Attendance Rate</div>
-        <div class="stat-value">${rate !== null ? rate + '%' : '—'}</div>
-        <div class="stat-caption">${rateBadge(rate)}</div>
+        <div class="stat-label">Honors Earned</div>
+        <div class="stat-value" style="color:${honorsQuarters.length > 0 ? 'var(--success)' : 'var(--ink)'};">${hasAnyReleased ? honorsQuarters.length : '—'}</div>
+        <div class="stat-caption">Quarters with honors recognition</div>
       </div>
     `;
 
-    document.getElementById('honorCardSubtitle').textContent = `Based on the ${label} average`;
-    document.getElementById('honorBadgeWrap').innerHTML = honorBadgeHtml(computeQuarterAverage());
+    renderAttendanceByQuarterTable();
+    renderHonorsRecognition(honorsQuarters);
+  }
+
+  function renderAttendanceByQuarterTable() {
+    const wrap = document.getElementById('attendanceByQuarterWrap');
+    const rows = childQuarters
+      .map(q => ({ quarter: q, rec: attendanceRecordFor(q.short) }))
+      .filter(r => r.rec !== null);
+
+    if (rows.length === 0) {
+      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>Attendance will appear here once the school releases a quarter.</td></tr></tbody></table>`;
+      return;
+    }
+
+    wrap.innerHTML = `
+      <table class="table">
+        <thead><tr><th>Quarter</th><th>Present</th><th>Absent</th><th>Tardy</th><th>Rate</th></tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const present = Number(r.rec.present_days) || 0;
+            const absent = Number(r.rec.absent_days) || 0;
+            const tardy = Number(r.rec.tardy_days) || 0;
+            const schoolDays = Number(r.rec.school_days) || 0;
+            const rate = schoolDays > 0 ? Math.round((present / schoolDays) * 1000) / 10 : null;
+            return `
+              <tr>
+                <td>${escapeHtml(r.quarter.short)}</td>
+                <td class="mono">${present}</td>
+                <td class="mono">${absent}</td>
+                <td class="mono">${tardy}</td>
+                <td>${rateBadge(rate)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderHonorsRecognition(honorsQuarters) {
+    const wrap = document.getElementById('honorsRecognitionWrap');
+
+    if (honorsQuarters.length === 0) {
+      wrap.innerHTML = `<div class="empty-msg">No honors recognition yet this school year — keep going!</div>`;
+      return;
+    }
+
+    wrap.innerHTML = honorsQuarters.map(item => `
+      <div class="honor-recognition-row">
+        <div class="honor-recognition-icon">🏅</div>
+        <div>
+          <div class="honor-recognition-descriptor">${escapeHtml(item.descriptor)}</div>
+          <div class="honor-recognition-meta">${escapeHtml(item.quarter.quarter)} · General Average ${item.average.toFixed(1)}</div>
+        </div>
+      </div>
+    `).join('');
   }
 
   // ---------- Remarks & Values ----------
