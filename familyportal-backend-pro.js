@@ -829,7 +829,7 @@ app.get('/api/subjects', verifyToken, async (req, res) => {
 
   try {
     const subjects = await client.query(
-      `SELECT code, name
+      `SELECT code, name, teacher_name
        FROM subjects
        WHERE school_id = $1 AND grade_level = $2
        ORDER BY name ASC`,

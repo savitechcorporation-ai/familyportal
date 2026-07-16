@@ -81,6 +81,12 @@
       border-radius: var(--radius-sm); margin-bottom: 16px;
     }
 
+    /* ---------- Grades page ---------- */
+    .muted-cell { color: var(--muted); font-size: 12px; }
+    .grade-cell { font-variant-numeric: tabular-nums; }
+    .grade-subject-row { cursor: pointer; }
+    .grade-expand-row td { background: var(--surface); padding: 0; }
+
     .trend-chart { display: flex; align-items: flex-end; gap: 14px; height: 180px; padding: 10px 4px 0; }
     .trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
     .trend-bar-value { font-size: 12px; font-weight: 700; color: var(--maroon); font-family: var(--font-mono); margin-bottom: 6px; }
@@ -289,12 +295,14 @@
 
       <!-- GRADES PAGE -->
       <div id="gradesSection" class="section hidden">
-        <div class="stat-row stat-row-2" id="gradesStatRow"></div>
         <div class="card">
           <div class="card-header">
-            <h3 id="gradesCardTitle">Grades</h3>
-            <div class="card-subtitle" id="gradesCardSubtitle"></div>
+            <h3 id="gradesCardTitle">All Subjects</h3>
+            <div class="card-subtitle">Click a subject to see its quarter-by-quarter trend</div>
           </div>
+          <div class="overview-error-banner hidden" id="gradesError" style="margin:14px 18px 0;">Some information may be out of date — we couldn't reach the server just now.</div>
+          <div class="empty-msg hidden" id="gradesLoading" style="padding:18px;">Loading grades…</div>
+          <div class="placeholder-card hidden" id="gradesEmpty" style="margin:18px;">Grades will appear here once the school releases them.</div>
           <div class="card-body table-scroll" style="padding:0;" id="gradesTableWrap"></div>
         </div>
       </div>
@@ -361,6 +369,7 @@
   let activeQuarterLabel = null;
   let cachedAnnouncements = [];
   let lastFetchHadError = false;
+  let expandedGradeSubject = null;
 
   const PAGE_TITLES = {
     overview: { title: 'Overview', subtitle: "A quick summary of your child's performance" },
@@ -612,7 +621,9 @@
   // ---------- Per-child data loading ----------
   async function loadChildData(studentId) {
     showOverviewLoading();
+    showGradesLoading();
     lastFetchHadError = false;
+    expandedGradeSubject = null;
 
     const child = children.find(c => c.id === studentId);
 
@@ -646,6 +657,13 @@
     document.getElementById('overviewContent').classList.add('hidden');
     document.getElementById('overviewEmpty').classList.add('hidden');
     document.getElementById('overviewError').classList.add('hidden');
+  }
+
+  function showGradesLoading() {
+    document.getElementById('gradesLoading').classList.remove('hidden');
+    document.getElementById('gradesTableWrap').innerHTML = '';
+    document.getElementById('gradesEmpty').classList.add('hidden');
+    document.getElementById('gradesError').classList.add('hidden');
   }
 
   async function fetchGrades(studentId) {
@@ -738,18 +756,9 @@
     // reportcards is a static placeholder - nothing to render
   }
 
-  function gradeRemarkBadge(score) {
-    if (score === null || score === undefined || score === '') return '<span class="pill pill-gray">Not entered</span>';
-    const num = Number(score);
-    if (isNaN(num)) return '<span class="pill pill-gray">Not entered</span>';
-    if (num >= 90) return '<span class="pill pill-green">Outstanding</span>';
-    if (num >= 75) return '<span class="pill pill-gray">Passed</span>';
-    return '<span class="pill pill-red">Needs support</span>';
-  }
-
   // short defaults to the global quarter-selector state (used by the
-  // Grades/Attendance pages); Overview passes an explicit quarter (always
-  // the latest released one) so it stays independent of that selector.
+  // Attendance page); Overview and Grades pass an explicit quarter so they
+  // stay independent of that selector.
   function computeQuarterAverage(short) {
     const num = quarterNumber(short || activeQuarterShort);
     if (!num) return null;
@@ -1027,52 +1036,140 @@
     `;
   }
 
-  // ---------- Grades ----------
+  // ---------- Grades (quarter-by-quarter breakdown) ----------
+  //
+  // This page is independent of the sidebar quarter-selector - it always
+  // shows all four quarter columns at once, so there's no single "active
+  // quarter" to scope it to. Release gating is enforced server-side by
+  // GET /api/grades/:studentId (see the query's `q.status = 'released'`
+  // filter) - an unreleased quarter simply never contributes a row, so its
+  // q1-q4 value is indistinguishable from "no grade yet" here, which is
+  // exactly the "—" this page shows for both cases.
+
+  // Same 5-tier DepEd-style scale used on the Overview grades table,
+  // applied here as a text color instead of a pill badge.
+  function gradeValueColor(score) {
+    if (score === null || score === undefined || score === '') return 'var(--muted)';
+    const num = Number(score);
+    if (isNaN(num)) return 'var(--muted)';
+    if (num >= 90) return 'var(--success)';
+    if (num >= 85) return 'var(--success)';
+    if (num >= 80) return 'var(--warning)';
+    if (num >= 75) return 'var(--warning)';
+    return 'var(--danger)';
+  }
+
+  // Average of whichever quarters actually have a released grade - not an
+  // "official final grade" that waits for all four quarters to exist.
+  function subjectFinalAverage(g) {
+    const vals = [1, 2, 3, 4].map(n => g['q' + n]).filter(v => v !== null && v !== undefined).map(Number);
+    if (vals.length === 0) return null;
+    return Math.round((vals.reduce((sum, v) => sum + v, 0) / vals.length) * 10) / 10;
+  }
+
+  // Compares the two most recent released quarters that have a grade.
+  function subjectTrendIndicator(g) {
+    const vals = [1, 2, 3, 4]
+      .map(n => (g['q' + n] !== null && g['q' + n] !== undefined) ? Number(g['q' + n]) : null)
+      .filter(v => v !== null);
+    if (vals.length < 2) return '<span style="color:var(--muted); font-weight:700;">▬</span>';
+    const last = vals[vals.length - 1];
+    const prev = vals[vals.length - 2];
+    if (last > prev) return '<span style="color:var(--success); font-weight:700;">▲</span>';
+    if (last < prev) return '<span style="color:var(--danger); font-weight:700;">▼</span>';
+    return '<span style="color:var(--muted); font-weight:700;">▬</span>';
+  }
+
+  function renderSubjectTrendChartHtml(g) {
+    const points = [1, 2, 3, 4]
+      .map(n => ({ short: 'Q' + n, value: (g['q' + n] !== null && g['q' + n] !== undefined) ? Number(g['q' + n]) : null }))
+      .filter(p => p.value !== null);
+
+    if (points.length === 0) {
+      return `<div class="empty-msg" style="padding:16px 18px;">No released grades yet for this subject.</div>`;
+    }
+
+    const primary = getComputedStyle(document.documentElement).getPropertyValue('--maroon').trim() || '#6B1E2E';
+    const min = 60, max = 100, n = points.length;
+
+    return `
+      <div class="trend-chart" style="padding:16px 18px;">
+        ${points.map((p, i) => {
+          const pct = Math.max(8, Math.min(100, ((p.value - min) / (max - min)) * 100));
+          const color = tintHex(primary, Math.min((n - 1 - i) * 0.16, 0.62));
+          return `
+            <div class="trend-bar-col">
+              <div class="trend-bar-value">${p.value}</div>
+              <div class="trend-bar-track">
+                <div class="trend-bar-fill" style="height:${pct}%; background:${color};"></div>
+              </div>
+              <div class="trend-bar-label">${p.short}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function toggleSubjectExpand(code) {
+    expandedGradeSubject = (expandedGradeSubject === code) ? null : code;
+    renderGrades();
+  }
+
   function renderGrades() {
-    const label = activeQuarterLabel || 'Quarter';
-    document.getElementById('gradesCardTitle').textContent = `Grades — ${label}`;
+    document.getElementById('gradesLoading').classList.add('hidden');
+    document.getElementById('gradesError').classList.toggle('hidden', !lastFetchHadError);
+    document.getElementById('gradesCardTitle').textContent = `All Subjects — S.Y. ${SCHOOL_YEAR}`;
 
-    const statWrap = document.getElementById('gradesStatRow');
     const wrap = document.getElementById('gradesTableWrap');
+    const emptyState = document.getElementById('gradesEmpty');
 
-    if (!activeQuarterShort || childGrades.length === 0) {
-      statWrap.innerHTML = '';
-      document.getElementById('gradesCardSubtitle').textContent = 'No grades released yet';
-      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No grades released yet.</td></tr></tbody></table>`;
+    if (childQuarters.length === 0) {
+      emptyState.classList.remove('hidden');
+      wrap.innerHTML = '';
+      return;
+    }
+    emptyState.classList.add('hidden');
+
+    if (childSubjects.length === 0) {
+      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No subjects set up for this grade level yet.</td></tr></tbody></table>`;
       return;
     }
 
-    const num = quarterNumber(activeQuarterShort);
-    const rows = childGrades.map(g => ({ subject: g.subject, score: g['q' + num] }));
-    const graded = rows.filter(r => r.score !== null && r.score !== undefined);
-    const avg = computeQuarterAverage();
-
-    document.getElementById('gradesCardSubtitle').textContent = `${graded.length}/${rows.length} subjects graded for ${label}`;
-
-    statWrap.innerHTML = `
-      <div class="stat-card">
-        <div class="stat-label">${label} Average</div>
-        <div class="stat-value">${avg !== null ? avg : '—'}</div>
-        <div class="stat-caption">Across ${graded.length} graded subject${graded.length === 1 ? '' : 's'}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Subjects Graded</div>
-        <div class="stat-value">${graded.length}/${rows.length}</div>
-        <div class="stat-caption">For ${label}</div>
-      </div>
-    `;
+    const gradesByCode = {};
+    childGrades.forEach(g => { gradesByCode[g.subject] = g; });
 
     wrap.innerHTML = `
       <table class="table">
-        <thead><tr><th>Subject</th><th>Grade</th><th>Remark</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Subject</th><th>Teacher</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Final Avg.</th><th>Trend</th>
+          </tr>
+        </thead>
         <tbody>
-          ${rows.map(r => `
-            <tr>
-              <td>${escapeHtml(r.subject)}</td>
-              <td class="mono">${r.score !== null && r.score !== undefined ? r.score : '—'}</td>
-              <td>${gradeRemarkBadge(r.score)}</td>
-            </tr>
-          `).join('')}
+          ${childSubjects.map(s => {
+            const g = gradesByCode[s.code] || {};
+            const quarterCells = [1, 2, 3, 4].map(n => {
+              const v = g['q' + n];
+              const display = (v !== null && v !== undefined) ? v : '—';
+              return `<td class="mono grade-cell" style="color:${gradeValueColor(v)};">${display}</td>`;
+            }).join('');
+            const finalAvg = subjectFinalAverage(g);
+            const expanded = expandedGradeSubject === s.code;
+
+            return `
+              <tr class="grade-subject-row" onclick="toggleSubjectExpand('${s.code}')">
+                <td><strong>${escapeHtml(s.name)}</strong></td>
+                <td class="muted-cell">${s.teacher_name ? escapeHtml(s.teacher_name) : '—'}</td>
+                ${quarterCells}
+                <td class="mono grade-cell" style="font-weight:700; color:${gradeValueColor(finalAvg)};">${finalAvg !== null ? finalAvg.toFixed(1) : '—'}</td>
+                <td>${subjectTrendIndicator(g)}</td>
+              </tr>
+              <tr class="grade-expand-row ${expanded ? '' : 'hidden'}">
+                <td colspan="8">${expanded ? renderSubjectTrendChartHtml(g) : ''}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     `;
