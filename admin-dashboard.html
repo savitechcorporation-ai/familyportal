@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BCMA Grades Portal Dashboard</title>
+  <link rel="stylesheet" href="login-header.css">
   <style>
     :root {
       --maroon: #7a1f2b;
@@ -49,7 +50,7 @@
       display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
       position: relative; overflow: hidden;
     }
-    .brand-logo img, .login-icon img {
+    .brand-logo img {
       width: 100%; height: 100%; object-fit: cover; border-radius: inherit;
     }
     .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: white; }
@@ -133,6 +134,7 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
+      padding: 16px;
       background: linear-gradient(160deg, var(--maroon) 0%, var(--maroon-dark) 100%);
     }
 
@@ -145,20 +147,8 @@
       overflow: hidden;
     }
 
-    .login-header {
-      background: var(--maroon);
-      padding: 32px 30px 24px;
-      text-align: center;
-    }
-
-    .login-icon {
-      width: 56px; height: 56px; margin: 0 auto 14px;
-      background: var(--gold); border-radius: 14px;
-      display: flex; align-items: center; justify-content: center; font-size: 26px;
-    }
-
-    .login-header h1 { font-family: var(--font-display); color: white; font-size: 24px; margin-bottom: 6px; }
-    .login-header p { color: #e8c9cd; font-size: 13px; }
+    /* .login-header / .login-header-logo styling now lives in
+       login-header.css (shared with parent-portal.html) */
 
     .login-body { padding: 28px 30px 32px; }
 
@@ -561,14 +551,7 @@
 <!-- LOGIN SCREEN -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <div class="login-header" id="loginHeader">
-      <div class="login-icon" id="loginIconBox">
-        <span id="loginIconEmoji">🏫</span>
-        <img id="loginIconImg" class="hidden" alt="" />
-      </div>
-      <h1 id="loginTitle">BCMA Grades Portal</h1>
-      <p>Manage students, grades, and announcements</p>
-    </div>
+    <div class="login-header" id="loginHeader"></div>
     <div class="login-body">
       <div class="form-group">
         <label>School ID</label>
@@ -991,6 +974,17 @@
               <input type="text" id="displayNameInput" placeholder="e.g. BCMA Grades Portal" oninput="updateBrandingPreview()" />
             </div>
 
+            <div class="settings-grid" style="margin-top:18px;">
+              <div class="form-group">
+                <label>Admin Login Subtitle</label>
+                <input type="text" id="adminTaglineInput" placeholder="Manage students, grades, and announcements" />
+              </div>
+              <div class="form-group">
+                <label>Parent Login Subtitle</label>
+                <input type="text" id="parentTaglineInput" placeholder="Parents Grade Portal" />
+              </div>
+            </div>
+
             <div class="field-label">Live Preview</div>
             <div class="branding-mini-preview">
               <div class="mini-sidebar" id="miniSidebar">
@@ -1031,10 +1025,12 @@
   </div>
 </div>
 
+<script src="login-header.js"></script>
 <script>
   // Check if already logged in
 window.addEventListener('DOMContentLoaded', () => {
   applyBranding();
+  initLoginHeader(LOGIN_HEADER_CONFIG);
 
   const savedToken = localStorage.getItem('adminToken');
   if (savedToken) {
@@ -1068,6 +1064,14 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentUserRole = null;
   const DEFAULT_PRIMARY_COLOR = '#7a1f2b';
   const DEFAULT_ACCENT_COLOR = '#b8860b';
+  const LOGIN_HEADER_CONFIG = {
+    apiBase: API_BASE,
+    mountId: 'loginHeader',
+    taglineField: 'admin_portal_tagline',
+    defaultTagline: 'Manage students, grades, and announcements',
+    defaultTitle: 'BCMA Grades Portal',
+    defaultScrimColor: DEFAULT_PRIMARY_COLOR
+  };
 
   // ---------- Branding (white-label) ----------
   function hexToRgb(hex) {
@@ -1107,7 +1111,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function setLogoImage(url) {
-    ['brandLogoImg', 'loginIconImg'].forEach(imgId => {
+    ['brandLogoImg'].forEach(imgId => {
       const img = document.getElementById(imgId);
       if (!img) return;
       const emoji = document.getElementById(imgId.replace('Img', 'Emoji'));
@@ -1125,29 +1129,20 @@ window.addEventListener('DOMContentLoaded', () => {
     iconLink.href = url;
   }
 
-  function setBannerBackground(url, scrimColor) {
-    const header = document.getElementById('loginHeader');
-    if (!header) return;
-    header.style.backgroundImage =
-      `linear-gradient(${hexToRgba(scrimColor, 0.78)}, ${hexToRgba(darkenHex(scrimColor, 0.18), 0.85)}), url('${url}')`;
-    header.style.backgroundSize = 'cover';
-    header.style.backgroundPosition = 'center';
-  }
-
-  // Fetched before login (public endpoint) so the login screen itself is
-  // branded. Failures here fall back to this app's built-in defaults -
-  // branding is never allowed to block the rest of the app from working.
+  // Fetched before login (public endpoint) so the sidebar/app UI is branded
+  // as soon as it's visible. The login screen's own header (banner, round
+  // logo, name, tagline) is handled separately by the shared
+  // initLoginHeader() from login-header.js. Failures here fall back to this
+  // app's built-in defaults - branding is never allowed to block the rest
+  // of the app from working.
   async function applyBranding() {
     try {
       const response = await fetch(`${API_BASE}/branding?schoolId=1`);
       const data = await response.json();
 
       if (data.display_name) {
-        document.title = data.display_name;
         const brandNameEl = document.getElementById('brandName');
         if (brandNameEl) brandNameEl.textContent = data.display_name;
-        const loginTitleEl = document.getElementById('loginTitle');
-        if (loginTitleEl) loginTitleEl.textContent = data.display_name;
       }
 
       applyColors(data.primary_color, data.accent_color);
@@ -1156,10 +1151,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (data.hasLogo) {
         setLogoImage(`${API_BASE}/branding/logo?schoolId=1&v=${v}`);
-      }
-
-      if (data.hasBanner) {
-        setBannerBackground(`${API_BASE}/branding/banner?schoolId=1&v=${v}`, data.primary_color || DEFAULT_PRIMARY_COLOR);
       }
 
     } catch (error) {
@@ -1723,6 +1714,8 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('displayNameInput').value = data.display_name || '';
       document.getElementById('primaryColorInput').value = data.primary_color || DEFAULT_PRIMARY_COLOR;
       document.getElementById('accentColorInput').value = data.accent_color || DEFAULT_ACCENT_COLOR;
+      document.getElementById('adminTaglineInput').value = data.admin_portal_tagline || '';
+      document.getElementById('parentTaglineInput').value = data.parent_portal_tagline || '';
 
       brandingState.logoDataUrl = null;
       brandingState.logoRemoved = false;
@@ -1764,7 +1757,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const payload = {
       displayName: document.getElementById('displayNameInput').value,
       primaryColor: document.getElementById('primaryColorInput').value,
-      accentColor: document.getElementById('accentColorInput').value
+      accentColor: document.getElementById('accentColorInput').value,
+      adminTagline: document.getElementById('adminTaglineInput').value,
+      parentTagline: document.getElementById('parentTaglineInput').value
     };
 
     if (brandingState.logoRemoved) {
@@ -1794,7 +1789,8 @@ window.addEventListener('DOMContentLoaded', () => {
         savedEl.classList.remove('hidden');
         setTimeout(() => savedEl.classList.add('hidden'), 2000);
         await loadBrandingSettings();
-        await applyBranding(); // refresh the real sidebar/login immediately
+        await applyBranding(); // refresh the real sidebar immediately
+        await initLoginHeader(LOGIN_HEADER_CONFIG); // refresh the real login header too
       } else {
         alert('Error: ' + data.error);
       }

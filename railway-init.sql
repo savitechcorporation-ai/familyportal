@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS schools (
   primary_color       TEXT,
   accent_color        TEXT,
   display_name        TEXT,
+  admin_portal_tagline  TEXT,
+  parent_portal_tagline TEXT,
   branding_updated_at TIMESTAMP,
   created_at          TIMESTAMP NOT NULL DEFAULT NOW()
 );

@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FamilyPortal - Parent</title>
+  <title>Parents Grade Portal</title>
+  <link rel="stylesheet" href="login-header.css">
   <style>
     :root {
       --maroon: #6B1E2E;
@@ -39,15 +40,8 @@
       flex-shrink: 0;
       position: relative; overflow: hidden;
     }
-    .brand .logo img, .login-logo img {
+    .brand .logo img {
       width: 100%; height: 100%; object-fit: cover; border-radius: inherit;
-    }
-    .login-logo {
-      width: 52px; height: 52px; margin: 0 auto 16px;
-      background: var(--gold); border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: var(--maroon); font-size: 22px;
-      position: relative; overflow: hidden;
     }
     .brand .names { line-height: 1.3; }
     .brand .names .app-name { font-weight: 700; font-size: 15px; }
@@ -284,26 +278,23 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
+      padding: 16px;
       background: linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%);
     }
 
     .login-box {
       background: white;
-      padding: 40px;
       border-radius: 12px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.25);
       width: 100%;
       max-width: 400px;
+      overflow: hidden;
     }
 
-    .login-box h1 {
-      font-family: Georgia, 'Times New Roman', serif;
-      color: var(--maroon);
-      margin-bottom: 10px;
-      font-size: 28px;
-    }
+    /* .login-header / .login-header-logo styling lives in login-header.css
+       (shared with admin-dashboard.html) */
 
-    .login-box p { color: #666; margin-bottom: 30px; font-size: 14px; }
+    .login-body { padding: 28px 30px 32px; }
 
     .form-group { margin-bottom: 20px; }
 
@@ -361,36 +352,32 @@
 <!-- LOGIN SCREEN -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <div class="login-logo" id="loginLogoBox">
-      <span id="loginIconEmoji">🎓</span>
-      <img id="loginIconImg" class="hidden" alt="" />
+    <div class="login-header" id="loginHeader"></div>
+    <div class="login-body">
+      <div class="form-group">
+        <label>School ID</label>
+        <input type="number" id="schoolId" placeholder="1" />
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="parentEmail" placeholder="parent@email.com" />
+      </div>
+
+      <div class="form-group">
+        <label>Student ID Number</label>
+        <input type="text" id="studentNumber" placeholder="e.g. 2026-00123" />
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="parentPassword" placeholder="••••••••" />
+      </div>
+
+      <button class="btn-login" onclick="handleParentLogin()">Sign In</button>
+
+      <div class="error-msg" id="loginError"></div>
     </div>
-    <h1 id="loginTitle">FamilyPortal</h1>
-    <p>View your child's grades, attendance, and announcements</p>
-
-    <div class="form-group">
-      <label>School ID</label>
-      <input type="number" id="schoolId" placeholder="1" />
-    </div>
-
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="parentEmail" placeholder="parent@email.com" />
-    </div>
-
-    <div class="form-group">
-      <label>Student ID Number</label>
-      <input type="text" id="studentNumber" placeholder="e.g. 2026-00123" />
-    </div>
-
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="parentPassword" placeholder="••••••••" />
-    </div>
-
-    <button class="btn-login" onclick="handleParentLogin()">Sign In</button>
-
-    <div class="error-msg" id="loginError"></div>
   </div>
 </div>
 
@@ -403,7 +390,7 @@
         <img id="brandLogoImg" class="hidden" alt="" />
       </div>
       <div class="names">
-        <div class="app-name" id="brandName">FamilyPortal</div>
+        <div class="app-name" id="brandName">BCMA Grades Portal</div>
         <div class="school-name" id="schoolNameLabel"></div>
       </div>
     </div>
@@ -497,9 +484,19 @@
   </div>
 </div>
 
+<script src="login-header.js"></script>
 <script>
   const API_BASE = 'https://familyportal.onrender.com/api';
   const SCHOOL_YEAR = '2026-2027';
+  const LOGIN_HEADER_CONFIG = {
+    apiBase: API_BASE,
+    mountId: 'loginHeader',
+    taglineField: 'parent_portal_tagline',
+    defaultTagline: 'Parents Grade Portal',
+    defaultTitle: 'BCMA Grades Portal',
+    defaultScrimColor: '#6B1E2E',
+    titleSuffix: 'Parents Grade Portal'
+  };
 
   let authToken = null;
   let currentSchoolId = null;
@@ -553,7 +550,7 @@
   }
 
   function setLogoImage(url) {
-    ['brandLogoImg', 'loginIconImg'].forEach(imgId => {
+    ['brandLogoImg'].forEach(imgId => {
       const img = document.getElementById(imgId);
       if (!img) return;
       const emoji = document.getElementById(imgId.replace('Img', 'Emoji'));
@@ -571,29 +568,20 @@
     iconLink.href = url;
   }
 
-  function setBannerBackground(url, scrimColor) {
-    const screen = document.getElementById('loginScreen');
-    if (!screen) return;
-    screen.style.backgroundImage =
-      `linear-gradient(${hexToRgba(scrimColor, 0.75)}, ${hexToRgba(darkenHex(scrimColor, 0.18), 0.85)}), url('${url}')`;
-    screen.style.backgroundSize = 'cover';
-    screen.style.backgroundPosition = 'center';
-  }
-
-  // Fetched before login (public endpoint) so the login screen itself is
-  // branded. Failures here fall back to this app's built-in defaults -
-  // branding is never allowed to block the rest of the app from working.
+  // Fetched before login (public endpoint) so the sidebar is branded as
+  // soon as it's visible. The login screen's own header (banner, round
+  // logo, name, tagline) is handled separately by the shared
+  // initLoginHeader() from login-header.js. Failures here fall back to this
+  // app's built-in defaults - branding is never allowed to block the rest
+  // of the app from working.
   async function applyBranding() {
     try {
       const response = await fetch(`${API_BASE}/branding?schoolId=1`);
       const data = await response.json();
 
       if (data.display_name) {
-        document.title = data.display_name + ' - Parent';
         const brandNameEl = document.getElementById('brandName');
         if (brandNameEl) brandNameEl.textContent = data.display_name;
-        const loginTitleEl = document.getElementById('loginTitle');
-        if (loginTitleEl) loginTitleEl.textContent = data.display_name;
       }
 
       applyColors(data.primary_color, data.accent_color);
@@ -604,10 +592,6 @@
         setLogoImage(`${API_BASE}/branding/logo?schoolId=1&v=${v}`);
       }
 
-      if (data.hasBanner) {
-        setBannerBackground(`${API_BASE}/branding/banner?schoolId=1&v=${v}`, data.primary_color || '#6B1E2E');
-      }
-
     } catch (error) {
       console.error('Failed to load branding (using defaults):', error.message);
     }
@@ -615,6 +599,7 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     applyBranding();
+    initLoginHeader(LOGIN_HEADER_CONFIG);
 
     document.querySelectorAll('.year-pill').forEach(el => {
       el.textContent = `S.Y. ${SCHOOL_YEAR}`;

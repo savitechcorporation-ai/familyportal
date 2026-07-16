@@ -50,6 +50,7 @@ app.get('/api/branding', async (req, res) => {
   try {
     const result = await client.query(
       `SELECT display_name, name, primary_color, accent_color,
+              admin_portal_tagline, parent_portal_tagline,
               (logo IS NOT NULL) AS "hasLogo",
               (banner IS NOT NULL) AS "hasBanner",
               branding_updated_at
@@ -58,7 +59,11 @@ app.get('/api/branding', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.json({ display_name: null, primary_color: null, accent_color: null, hasLogo: false, hasBanner: false, updated_at: null });
+      return res.json({
+        display_name: null, primary_color: null, accent_color: null,
+        admin_portal_tagline: null, parent_portal_tagline: null,
+        hasLogo: false, hasBanner: false, updated_at: null
+      });
     }
 
     const row = result.rows[0];
@@ -66,6 +71,8 @@ app.get('/api/branding', async (req, res) => {
       display_name: row.display_name || row.name || null,
       primary_color: row.primary_color,
       accent_color: row.accent_color,
+      admin_portal_tagline: row.admin_portal_tagline,
+      parent_portal_tagline: row.parent_portal_tagline,
       hasLogo: row.hasLogo,
       hasBanner: row.hasBanner,
       updated_at: row.branding_updated_at
@@ -1131,7 +1138,7 @@ app.patch('/api/admin/branding', verifyToken, async (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  const { displayName, primaryColor, accentColor, logo, banner, removeLogo, removeBanner } = req.body;
+  const { displayName, primaryColor, accentColor, adminTagline, parentTagline, logo, banner, removeLogo, removeBanner } = req.body;
 
   if (primaryColor && !HEX_COLOR_RE.test(primaryColor)) {
     return res.status(400).json({ error: 'Invalid primary color' });
@@ -1155,6 +1162,14 @@ app.patch('/api/admin/branding', verifyToken, async (req, res) => {
     if (accentColor) {
       params.push(accentColor);
       updates.push(`accent_color = $${params.length}`);
+    }
+    if (adminTagline !== undefined) {
+      params.push(adminTagline);
+      updates.push(`admin_portal_tagline = $${params.length}`);
+    }
+    if (parentTagline !== undefined) {
+      params.push(parentTagline);
+      updates.push(`parent_portal_tagline = $${params.length}`);
     }
 
     if (removeLogo) {
@@ -1199,6 +1214,7 @@ app.patch('/api/admin/branding', verifyToken, async (req, res) => {
       `UPDATE schools SET ${updates.join(', ')}
        WHERE id = $${params.length}
        RETURNING display_name, primary_color, accent_color,
+                 admin_portal_tagline, parent_portal_tagline,
                  (logo IS NOT NULL) AS "hasLogo", (banner IS NOT NULL) AS "hasBanner",
                  branding_updated_at`,
       params

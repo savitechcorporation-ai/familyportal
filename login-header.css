@@ -1,0 +1,47 @@
+/* Shared login header — banner background, round logo, school name, tagline.
+   Used identically by admin-dashboard.html and parent-portal.html (mounted
+   via login-header.js's renderLoginHeader/initLoginHeader) so a visual
+   change here applies to both logins automatically. Relies only on the
+   --maroon and --gold custom properties, which both host pages define. */
+
+.login-header {
+  background: var(--maroon);
+  padding: 32px 30px 24px;
+  text-align: center;
+  background-size: cover;
+  background-position: center;
+}
+
+.login-header-logo {
+  width: 56px; height: 56px; margin: 0 auto 14px;
+  background: var(--gold); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
+  overflow: hidden; position: relative;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.35), 0 4px 14px rgba(0,0,0,0.25);
+}
+
+.login-header-logo img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: inherit;
+}
+
+.login-header h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 6px;
+}
+
+.login-header p {
+  color: #e8c9cd;
+  font-size: 13px;
+  margin: 0;
+}
+
+@media (max-width: 400px) {
+  .login-header { padding: 26px 18px 20px; }
+  .login-header-logo { width: 48px; height: 48px; margin-bottom: 12px; }
+  .login-header h1 { font-size: 19px; }
+  .login-header p { font-size: 12px; }
+}
