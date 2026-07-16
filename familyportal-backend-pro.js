@@ -376,13 +376,16 @@ app.get('/api/attendance/:studentId', verifyToken, async (req, res) => {
 
     // Same release-gating as grades. Aliased to the field names the
     // frontend already expects (it just sums these, doesn't care that this
-    // used to be per-month and is now per-quarter).
+    // used to be per-month and is now per-quarter). school_days is included
+    // so the parent portal can compute the same present/school_days
+    // attendance rate the admin dashboard shows.
     const attendance = await client.query(
       `SELECT
          q.short AS month,
          a.present AS present_days,
          a.absent AS absent_days,
-         a.tardy AS tardy_days
+         a.tardy AS tardy_days,
+         a.school_days AS school_days
        FROM attendance a
        JOIN quarters q ON q.id = a.quarter_id
        WHERE a.student_id = $1 AND q.school_year = $2

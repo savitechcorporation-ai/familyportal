@@ -4,347 +4,115 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parents Grade Portal</title>
+  <link rel="stylesheet" href="design-tokens.css">
   <link rel="stylesheet" href="login-header.css">
   <style>
-    :root {
-      --maroon: #6B1E2E;
-      --maroon-dark: #3a1420;
-      --maroon-muted: #5a2a35;
-      --gold: #C9A227;
-      --gold-dark: #4a3403;
-      --gold-tint: #e0bb3d;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #FAF6EE; }
+    /* Parent-portal-only styling. Design tokens + shared components
+       (sidebar, topbar, cards, tables, pills, stat-cards, buttons, login
+       shell) live in design-tokens.css, shared with admin-dashboard.html.
+       This block only covers things the admin dashboard doesn't have:
+       the child switcher, the honor badge, announcement text styling, and
+       the mobile top-bar shell (parents mostly use phones; admin doesn't
+       need a mobile layout). */
 
-    .container { display: flex; height: 100vh; }
+    .login-screen { background: linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%); }
 
-    /* Sidebar */
-    .sidebar {
-      width: 280px;
-      background: var(--maroon);
-      color: white;
-      padding: 25px 20px;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-    }
+    .sidebar-school-name { font-size: 10.5px; color: #d9b8bd; margin: -14px 0 18px; }
 
-    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
-    .brand .logo {
-      width: 36px; height: 36px;
-      background: var(--gold);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: var(--maroon); font-size: 16px;
-      flex-shrink: 0;
-      position: relative; overflow: hidden;
-    }
-    .brand .logo img {
-      width: 100%; height: 100%; object-fit: cover; border-radius: inherit;
-    }
-    .brand .names { line-height: 1.3; }
-    .brand .names .app-name { font-weight: 700; font-size: 15px; }
-    .brand .names .school-name { font-size: 12px; color: #e8c9cd; }
-
-    .sidebar-label {
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      color: #e8c9cd;
-      margin-bottom: 12px;
-      margin-top: 10px;
-      font-weight: 600;
-    }
-
-    .child-list { list-style: none; margin-bottom: 15px; }
+    .child-list { list-style: none; margin-bottom: 4px; }
     .child-list li { margin-bottom: 8px; }
-
     .child-card {
       width: 100%;
+      min-height: 44px;
       background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.12);
       color: white;
-      padding: 10px 12px;
+      padding: 9px 12px;
       text-align: left;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 13px;
-      transition: all 0.2s;
+      font-size: 12.5px;
+      font-family: var(--font);
+      transition: background 0.15s;
     }
-
-    .child-card .child-name { font-weight: 600; margin-bottom: 2px; }
+    .child-card .child-name { font-weight: 700; margin-bottom: 2px; }
     .child-card .child-meta { font-size: 11px; color: #e8c9cd; }
-
     .child-card:hover { background: rgba(255,255,255,0.12); }
-
-    .child-card.active {
-      background: var(--gold);
-      border-color: var(--gold);
-      color: var(--maroon-dark);
-    }
-    .child-card.active .child-meta { color: var(--maroon-muted); }
-
-    .nav-list { list-style: none; margin-top: 15px; margin-bottom: auto; }
-    .nav-list li { margin-bottom: 6px; }
-
-    .nav-btn {
-      width: 100%;
-      background: none;
-      border: none;
-      color: #e8c9cd;
-      padding: 12px 15px;
-      text-align: left;
-      border-radius: 999px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .nav-btn:hover { background: rgba(255,255,255,0.08); color: white; }
-
-    .nav-btn.active {
-      background: var(--gold);
-      color: var(--maroon-dark);
-      font-weight: 700;
-    }
-
-    .sidebar-footer {
-      border-top: 1px solid rgba(255,255,255,0.15);
-      padding-top: 15px;
-      margin-top: 15px;
-    }
+    .child-card.active { background: var(--gold); border-color: var(--gold); color: var(--maroon-dark); }
+    .child-card.active .child-meta { color: var(--maroon-dark); opacity: 0.75; }
 
     .parent-info { font-size: 12px; color: #e8c9cd; margin-bottom: 10px; line-height: 1.4; }
-    .parent-info .parent-name { color: white; font-weight: 600; font-size: 13px; }
-
-    .logout-btn {
-      width: 100%;
-      background: rgba(255,255,255,0.1);
-      border: none;
-      color: white;
-      padding: 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-
-    .logout-btn:hover { background: rgba(255,255,255,0.2); }
-
-    /* Main Content */
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-    }
-
-    .content {
-      flex: 1;
-      padding: 40px 45px;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 30px;
-    }
-
-    .page-header h1 {
-      font-family: Georgia, 'Times New Roman', serif;
-      color: var(--maroon);
-      font-size: 30px;
-      margin-bottom: 6px;
-    }
-
-    .page-header .subtitle { color: #7a7a7a; font-size: 14px; }
-
-    .year-pill {
-      background: white;
-      border: 1px solid #e5ddd0;
-      color: var(--maroon);
-      padding: 8px 16px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    /* Cards */
-    .card {
-      background: white;
-      border: 1px solid #efe8da;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 10px rgba(107, 30, 46, 0.05);
-    }
-
-    .card h3 {
-      color: var(--maroon);
-      font-size: 16px;
-      margin-bottom: 15px;
-    }
-
-    .cards-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .stat-value {
-      font-size: 34px;
-      font-weight: 700;
-      color: var(--maroon);
-      margin-bottom: 8px;
-    }
-
-    /* Status pills */
-    .pill {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .pill-outstanding { background: #d9f2ea; color: #0d8a63; }
-    .pill-satisfactory { background: #fbeecb; color: #96720f; }
-    .pill-attention { background: #fbe1e1; color: #b03434; }
-    .pill-ungraded { background: #eee; color: #888; }
+    .parent-info .parent-name { color: white; font-weight: 700; font-size: 13px; }
 
     .honor-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-tint) 100%);
-      color: var(--gold-dark);
-      padding: 8px 16px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 700;
-      margin-top: 10px;
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+      color: var(--maroon-dark);
+      padding: 8px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 700; margin-top: 14px;
     }
 
-    .subject-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid #f2ede1;
-      font-size: 13px;
-    }
-
-    .subject-row:last-child { border-bottom: none; }
-    .subject-row .subject-name { color: #333; font-weight: 500; }
-    .subject-row .subject-grade { color: var(--maroon); font-weight: 700; margin-right: 12px; }
-
-    .attendance-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 15px;
-      text-align: center;
-    }
-
-    .attendance-stat { padding: 10px; }
-    .attendance-stat .num { font-size: 26px; font-weight: 700; color: var(--maroon); }
-    .attendance-stat .label { font-size: 12px; color: #888; margin-top: 4px; }
-
-    .announcement {
-      padding: 14px 0;
-      border-bottom: 1px solid #f2ede1;
-    }
+    .announcement { padding: 14px 0; border-bottom: 1px solid #f1ece1; }
     .announcement:last-child { border-bottom: none; }
-    .announcement h4 { color: var(--maroon); font-size: 14px; margin-bottom: 4px; }
-    .announcement .date { color: #999; font-size: 11px; margin-bottom: 6px; }
-    .announcement p { color: #555; font-size: 13px; line-height: 1.5; }
+    .announcement h4 { font-family: var(--font-display); color: var(--maroon); font-size: 14px; margin-bottom: 4px; }
+    .announcement .date { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+    .announcement p { color: var(--slate); font-size: 13px; line-height: 1.5; }
 
-    .empty-msg { color: #999; font-size: 13px; padding: 10px 0; }
+    .stat-row-2 { grid-template-columns: repeat(2, 1fr); }
 
-    .placeholder-card {
-      background: white;
-      border: 1px dashed #d8cfbc;
-      border-radius: 12px;
-      padding: 60px 30px;
-      text-align: center;
-      color: #999;
-      font-size: 14px;
+    .values-display-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .value-display-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 10px 12px; background: var(--surface); border-radius: var(--radius-sm);
     }
+    .value-display-item .value-name { font-size: 12.5px; color: var(--slate); font-weight: 600; }
+    .value-display-item .value-hint { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 
-    /* Login Screen */
-    .login-screen {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      padding: 16px;
-      background: linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%);
-    }
+    .remarks-text { font-size: 13px; color: var(--slate); line-height: 1.7; }
 
-    .login-box {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
-      width: 100%;
-      max-width: 400px;
-      overflow: hidden;
-    }
-
-    /* .login-header / .login-header-logo styling lives in login-header.css
-       (shared with admin-dashboard.html) */
-
-    .login-body { padding: 28px 30px 32px; }
-
-    .form-group { margin-bottom: 20px; }
-
-    .form-group label {
-      display: block;
-      color: var(--maroon);
-      font-weight: 600;
-      margin-bottom: 8px;
-      font-size: 13px;
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: var(--gold);
-      box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
-    }
-
-    .btn-login {
-      width: 100%;
-      padding: 12px;
-      background: linear-gradient(135deg, var(--maroon) 0%, var(--gold) 100%);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
-    .btn-login:hover { transform: translateY(-2px); }
-
-    .error-msg {
-      color: #b03434;
-      font-size: 13px;
-      margin-top: 15px;
-      padding: 10px;
-      background: #fbe1e1;
-      border-radius: 4px;
+    /* ---------- Mobile shell (<900px): sidebar becomes a top app bar ---------- */
+    .mobile-menu-toggle {
       display: none;
+      width: 40px; height: 44px; flex-shrink: 0;
+      background: rgba(255,255,255,0.1); border: none; border-radius: 8px;
+      color: white; font-size: 18px; cursor: pointer;
+    }
+    .sidebar-collapsible { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+    @media (max-width: 900px) {
+      .container { flex-direction: column; height: auto; min-height: 100vh; }
+
+      .sidebar {
+        width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center;
+        padding: 12px 16px; overflow: visible;
+      }
+      .sidebar .brand { flex: 1; margin-bottom: 0; }
+      .sidebar-school-name { display: none; }
+
+      .mobile-menu-toggle { display: flex; align-items: center; justify-content: center; }
+
+      .sidebar-collapsible {
+        display: none; width: 100%; order: 3; margin-top: 14px; padding-top: 14px;
+        border-top: 1px solid rgba(255,255,255,0.15);
+      }
+      .sidebar.mobile-open .sidebar-collapsible { display: flex; }
+
+      .menu-btn { min-height: 44px; font-size: 13.5px; padding: 11px 12px; }
+      .child-card { min-height: 48px; }
+      .quarter-picker select { min-height: 44px; }
+      .logout-btn { min-height: 44px; }
+
+      .main { width: 100%; }
+      .topbar { padding: 12px 16px; }
+      .content { padding: 16px; }
+
+      .stat-row, .stat-row-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+      .two-col { grid-template-columns: 1fr; }
+      .values-display-grid { grid-template-columns: 1fr; }
     }
 
-    .hidden { display: none !important; }
+    @media (max-width: 420px) {
+      .stat-row, .stat-row-2 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -383,102 +151,119 @@
 
 <!-- PARENT PORTAL -->
 <div id="portalScreen" class="container" style="display: none;">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="logo" id="brandLogoBox">
-        <span id="brandLogoEmoji">FP</span>
+      <div class="brand-logo" id="brandLogoBox">
+        <span id="brandLogoEmoji">🏫</span>
         <img id="brandLogoImg" class="hidden" alt="" />
       </div>
-      <div class="names">
-        <div class="app-name" id="brandName">BCMA Grades Portal</div>
-        <div class="school-name" id="schoolNameLabel"></div>
+      <div>
+        <div class="brand-name" id="brandName">BCMA Grades Portal</div>
+        <div class="brand-subtitle">Parents Grade Portal</div>
       </div>
     </div>
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileNav()" aria-label="Menu">☰</button>
 
-    <div class="sidebar-label">MY CHILDREN</div>
-    <ul class="child-list" id="childList"></ul>
+    <div class="sidebar-collapsible" id="sidebarCollapsible">
+      <div class="sidebar-school-name" id="schoolNameLabel"></div>
 
-    <ul class="nav-list" id="navList">
-      <li><button class="nav-btn active" data-page="overview">Overview</button></li>
-      <li><button class="nav-btn" data-page="grades">Grades</button></li>
-      <li><button class="nav-btn" data-page="reportcards">Report Cards</button></li>
-      <li><button class="nav-btn" data-page="attendance">Attendance &amp; Honors</button></li>
-    </ul>
+      <div class="sidebar-label" id="childListLabel">MY CHILDREN</div>
+      <ul class="child-list" id="childList"></ul>
 
-    <div class="sidebar-footer">
-      <div class="parent-info">
-        <div class="parent-name" id="parentNameLabel"></div>
-        <div id="parentEmailLabel"></div>
+      <div class="quarter-picker">
+        <label>Quarter</label>
+        <select id="quarterSelect" onchange="handleQuarterChange()"></select>
       </div>
-      <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
+
+      <ul class="sidebar-menu" id="navList">
+        <li><button class="menu-btn active" data-page="overview">📈 Overview</button></li>
+        <li><button class="menu-btn" data-page="grades">📝 Grades</button></li>
+        <li><button class="menu-btn" data-page="attendance">🗓️ Attendance &amp; Honors</button></li>
+        <li><button class="menu-btn" data-page="remarks">💬 Remarks &amp; Values</button></li>
+        <li><button class="menu-btn" data-page="reportcards">📄 Report Cards</button></li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="parent-info">
+          <div class="parent-name" id="parentNameLabel"></div>
+          <div id="parentEmailLabel"></div>
+        </div>
+        <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
+      </div>
     </div>
   </div>
 
   <div class="main">
+    <div class="topbar">
+      <div class="topbar-title-group">
+        <h1 id="pageTitle">Overview</h1>
+        <span class="topbar-subtitle" id="pageSubtitle">A quick summary of your child's performance</span>
+      </div>
+      <div class="topbar-right">
+        <span class="year-badge" id="yearBadge">S.Y. 2026-2027</span>
+      </div>
+    </div>
+
     <div class="content">
-      <div class="page-header">
-        <div>
-          <h1 id="pageTitle">Overview</h1>
-          <div class="subtitle" id="pageSubtitle">A quick summary of your child's performance</div>
-        </div>
-        <div class="year-pill">S.Y. 2026-2027</div>
-      </div>
-
       <!-- OVERVIEW PAGE -->
-      <div id="overviewPage" class="page">
-        <div class="cards-row">
+      <div id="overviewSection" class="section active">
+        <div class="stat-row" id="overviewStatRow"></div>
+        <div class="two-col">
           <div class="card">
-            <h3>General Average</h3>
-            <div class="stat-value" id="generalAverage">--</div>
-            <span class="pill pill-ungraded" id="generalAveragePill">Ungraded</span>
-            <div id="honorBadge"></div>
-          </div>
-
-          <div class="card">
-            <h3>Attendance Summary</h3>
-            <div class="attendance-grid">
-              <div class="attendance-stat">
-                <div class="num" id="attendancePresent">--</div>
-                <div class="label">Present</div>
-              </div>
-              <div class="attendance-stat">
-                <div class="num" id="attendanceAbsent">--</div>
-                <div class="label">Absent</div>
-              </div>
-              <div class="attendance-stat">
-                <div class="num" id="attendanceTardy">--</div>
-                <div class="label">Tardy</div>
-              </div>
+            <div class="card-header">
+              <h3>Subjects at a Glance</h3>
+              <div class="card-subtitle" id="overviewSubjectsSubtitle">Latest quarter grades</div>
             </div>
+            <div class="card-body table-scroll" style="padding:0;" id="overviewSubjectsWrap"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Announcements</h3>
+              <div class="card-subtitle">Latest updates from your school</div>
+            </div>
+            <div class="card-body" id="announcementsList"></div>
           </div>
         </div>
+      </div>
 
+      <!-- GRADES PAGE -->
+      <div id="gradesSection" class="section hidden">
+        <div class="stat-row stat-row-2" id="gradesStatRow"></div>
         <div class="card">
-          <h3>Subjects at a Glance</h3>
-          <div id="subjectsList"></div>
-          <div class="empty-msg hidden" id="subjectsEmpty">No grades recorded yet.</div>
-        </div>
-
-        <div class="card">
-          <h3>Announcements</h3>
-          <div id="announcementsList"></div>
-          <div class="empty-msg hidden" id="announcementsEmpty">No announcements yet.</div>
+          <div class="card-header">
+            <h3 id="gradesCardTitle">Grades</h3>
+            <div class="card-subtitle" id="gradesCardSubtitle"></div>
+          </div>
+          <div class="card-body table-scroll" style="padding:0;" id="gradesTableWrap"></div>
         </div>
       </div>
 
-      <!-- GRADES PAGE (placeholder) -->
-      <div id="gradesPage" class="page hidden">
-        <div class="placeholder-card">Grades page coming soon.</div>
+      <!-- ATTENDANCE & HONORS PAGE -->
+      <div id="attendanceSection" class="section hidden">
+        <div class="stat-row" id="attendanceStatRow"></div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Honor Roll Status</h3>
+            <div class="card-subtitle" id="honorCardSubtitle">Based on this quarter's average</div>
+          </div>
+          <div class="card-body" id="honorBadgeWrap"></div>
+        </div>
       </div>
 
-      <!-- REPORT CARDS PAGE (placeholder) -->
-      <div id="reportcardsPage" class="page hidden">
+      <!-- REMARKS & VALUES PAGE -->
+      <div id="remarksSection" class="section hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3 id="remarksCardTitle">Remarks &amp; Values</h3>
+            <div class="card-subtitle" id="remarksCardSubtitle"></div>
+          </div>
+          <div class="card-body" id="remarksBody"></div>
+        </div>
+      </div>
+
+      <!-- REPORT CARDS PAGE (placeholder - no backend support yet) -->
+      <div id="reportcardsSection" class="section hidden">
         <div class="placeholder-card">Report Cards page coming soon.</div>
-      </div>
-
-      <!-- ATTENDANCE & HONORS PAGE (placeholder) -->
-      <div id="attendancePage" class="page hidden">
-        <div class="placeholder-card">Attendance &amp; Honors page coming soon.</div>
       </div>
     </div>
   </div>
@@ -504,12 +289,29 @@
   let activeStudentId = null;
   let activePage = 'overview';
 
+  // Data for the currently-selected child, fetched once per child switch
+  // and re-used across pages/quarter changes (no extra network calls when
+  // the parent just switches quarters or nav pages).
+  let childGrades = [];
+  let childAttendance = [];
+  let childQuarters = [];       // released quarters only, from /api/remarks-values (server-side gated)
+  let activeQuarterShort = null;
+  let activeQuarterLabel = null;
+  let cachedAnnouncements = [];
+
   const PAGE_TITLES = {
     overview: { title: 'Overview', subtitle: "A quick summary of your child's performance" },
     grades: { title: 'Grades', subtitle: 'Quarterly grades by subject' },
-    reportcards: { title: 'Report Cards', subtitle: 'Official report card records' },
-    attendance: { title: 'Attendance & Honors', subtitle: 'Attendance record and honor roll status' }
+    attendance: { title: 'Attendance & Honors', subtitle: 'Attendance record and honor roll status' },
+    remarks: { title: 'Remarks & Values', subtitle: "Adviser comments and core values ratings" },
+    reportcards: { title: 'Report Cards', subtitle: 'Official report card records' }
   };
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str === null || str === undefined ? '' : String(str);
+    return div.innerHTML;
+  }
 
   // ---------- Branding (white-label) ----------
   function hexToRgb(hex) {
@@ -540,12 +342,11 @@
     if (primaryColor) {
       document.documentElement.style.setProperty('--maroon', primaryColor);
       document.documentElement.style.setProperty('--maroon-dark', darkenHex(primaryColor, 0.18));
-      document.documentElement.style.setProperty('--maroon-muted', darkenHex(primaryColor, 0.05));
+      document.documentElement.style.setProperty('--maroon-light', tintHex(primaryColor, 0.88));
     }
     if (accentColor) {
       document.documentElement.style.setProperty('--gold', accentColor);
-      document.documentElement.style.setProperty('--gold-dark', darkenHex(accentColor, 0.55));
-      document.documentElement.style.setProperty('--gold-tint', tintHex(accentColor, 0.15));
+      document.documentElement.style.setProperty('--gold-light', tintHex(accentColor, 0.88));
     }
   }
 
@@ -601,11 +402,9 @@
     applyBranding();
     initLoginHeader(LOGIN_HEADER_CONFIG);
 
-    document.querySelectorAll('.year-pill').forEach(el => {
-      el.textContent = `S.Y. ${SCHOOL_YEAR}`;
-    });
+    document.getElementById('yearBadge').textContent = `S.Y. ${SCHOOL_YEAR}`;
 
-    document.querySelectorAll('.nav-btn').forEach(btn => {
+    document.querySelectorAll('.menu-btn').forEach(btn => {
       btn.addEventListener('click', () => switchPage(btn.dataset.page, btn));
     });
 
@@ -679,12 +478,15 @@
     document.getElementById('parentEmailLabel').textContent = parentEmail;
     document.getElementById('schoolNameLabel').textContent = schoolName;
 
+    const childListLabel = document.getElementById('childListLabel');
+    childListLabel.textContent = children.length > 1 ? 'MY CHILDREN' : 'MY CHILD';
+
     const childList = document.getElementById('childList');
     childList.innerHTML = children.map(child => `
       <li>
         <button class="child-card" data-id="${child.id}">
-          <div class="child-name">${child.name}</div>
-          <div class="child-meta">${child.grade_level || ''}${child.section ? ' - ' + child.section : ''}</div>
+          <div class="child-name">${escapeHtml(child.name)}</div>
+          <div class="child-meta">${escapeHtml(child.grade_level || '')}${child.section ? ' - ' + escapeHtml(child.section) : ''}</div>
         </button>
       </li>
     `).join('');
@@ -692,6 +494,8 @@
     document.querySelectorAll('.child-card').forEach(btn => {
       btn.addEventListener('click', () => selectChild(parseInt(btn.dataset.id), btn));
     });
+
+    loadAnnouncements();
 
     if (children.length > 0) {
       selectChild(children[0].id, document.querySelector('.child-card'));
@@ -704,185 +508,413 @@
     document.querySelectorAll('.child-card').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
 
-    renderActivePage();
+    closeMobileNav();
+    loadChildData(studentId);
   }
 
   function switchPage(page, btnEl) {
     activePage = page;
 
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
 
-    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-    document.getElementById(`${page}Page`).classList.remove('hidden');
+    document.querySelectorAll('.section').forEach(s => { s.classList.remove('active'); s.classList.add('hidden'); });
+    const section = document.getElementById(`${page}Section`);
+    section.classList.remove('hidden');
+    section.classList.add('active');
 
     document.getElementById('pageTitle').textContent = PAGE_TITLES[page].title;
     document.getElementById('pageSubtitle').textContent = PAGE_TITLES[page].subtitle;
 
+    closeMobileNav();
     renderActivePage();
   }
 
-  function renderActivePage() {
-    if (!activeStudentId) return;
-
-    if (activePage === 'overview') {
-      loadOverview(activeStudentId);
-    }
+  function toggleMobileNav() {
+    document.getElementById('sidebar').classList.toggle('mobile-open');
+  }
+  function closeMobileNav() {
+    document.getElementById('sidebar').classList.remove('mobile-open');
   }
 
-  function pillInfo(value) {
-    if (value === null || value === undefined || value === '') {
-      return { className: 'pill-ungraded', label: 'Ungraded' };
-    }
-    const num = parseFloat(value);
-    if (num >= 90) return { className: 'pill-outstanding', label: 'Outstanding' };
-    if (num >= 85) return { className: 'pill-satisfactory', label: 'Satisfactory' };
-    return { className: 'pill-attention', label: 'Needs Attention' };
+  function quarterNumber(short) {
+    const m = /(\d)/.exec(short || '');
+    return m ? parseInt(m[1], 10) : null;
   }
 
-  function statusPill(value) {
-    const info = pillInfo(value);
-    return `<span class="pill ${info.className}">${info.label}</span>`;
-  }
-
-  function setPill(el, value) {
-    const info = pillInfo(value);
-    el.className = `pill ${info.className}`;
-    el.textContent = info.label;
-  }
-
-  function honorBadge(average) {
-    if (average === null) return '';
-    if (average >= 98) return '<div class="honor-badge">🏅 With Highest Honors</div>';
-    if (average >= 95) return '<div class="honor-badge">🏅 With High Honors</div>';
-    if (average >= 90) return '<div class="honor-badge">🏅 With Honors</div>';
-    return '';
-  }
-
-  async function loadOverview(studentId) {
-    await Promise.all([
-      loadGradesSummary(studentId),
-      loadAttendanceSummary(studentId),
-      loadAnnouncements()
+  // ---------- Per-child data loading ----------
+  async function loadChildData(studentId) {
+    const [grades, attendance, remarksValues] = await Promise.all([
+      fetchGrades(studentId),
+      fetchAttendance(studentId),
+      fetchRemarksValues(studentId)
     ]);
+
+    childGrades = grades;
+    childAttendance = attendance;
+    childQuarters = remarksValues;
+
+    if (childQuarters.length > 0) {
+      const latest = childQuarters[childQuarters.length - 1];
+      activeQuarterShort = latest.short;
+      activeQuarterLabel = latest.quarter;
+    } else {
+      activeQuarterShort = null;
+      activeQuarterLabel = null;
+    }
+
+    renderQuarterSelect();
+    renderActivePage();
   }
 
-  async function loadGradesSummary(studentId) {
+  async function fetchGrades(studentId) {
     try {
       const response = await fetch(`${API_BASE}/grades/${studentId}?schoolYear=${SCHOOL_YEAR}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
-
-      const subjectsList = document.getElementById('subjectsList');
-      const subjectsEmpty = document.getElementById('subjectsEmpty');
-      const avgEl = document.getElementById('generalAverage');
-      const avgPillEl = document.getElementById('generalAveragePill');
-      const honorEl = document.getElementById('honorBadge');
-
-      if (!response.ok || data.length === 0) {
-        subjectsList.innerHTML = '';
-        subjectsEmpty.classList.remove('hidden');
-        avgEl.textContent = '--';
-        setPill(avgPillEl, null);
-        honorEl.innerHTML = '';
-        return;
-      }
-
-      subjectsEmpty.classList.add('hidden');
-
-      // Latest available quarter grade per subject (q4 -> q1 fallback)
-      const latestGrades = data.map(g => {
-        const latest = [g.q4, g.q3, g.q2, g.q1].find(v => v !== null && v !== undefined);
-        return { subject: g.subject, latest };
-      });
-
-      subjectsList.innerHTML = latestGrades.map(g => `
-        <div class="subject-row">
-          <span class="subject-name">${g.subject}</span>
-          <span>
-            <span class="subject-grade">${g.latest ?? '--'}</span>
-            ${statusPill(g.latest)}
-          </span>
-        </div>
-      `).join('');
-
-      const gradedValues = latestGrades.filter(g => g.latest !== undefined).map(g => parseFloat(g.latest));
-      if (gradedValues.length > 0) {
-        const average = gradedValues.reduce((sum, v) => sum + v, 0) / gradedValues.length;
-        const rounded = Math.round(average * 100) / 100;
-        avgEl.textContent = rounded;
-        setPill(avgPillEl, rounded);
-        honorEl.innerHTML = honorBadge(rounded);
-      } else {
-        avgEl.textContent = '--';
-        setPill(avgPillEl, null);
-        honorEl.innerHTML = '';
-      }
-
+      return response.ok && Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Failed to load grades:', error.message);
+      return [];
     }
   }
 
-  async function loadAttendanceSummary(studentId) {
+  async function fetchAttendance(studentId) {
     try {
       const response = await fetch(`${API_BASE}/attendance/${studentId}?schoolYear=${SCHOOL_YEAR}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        document.getElementById('attendancePresent').textContent = '--';
-        document.getElementById('attendanceAbsent').textContent = '--';
-        document.getElementById('attendanceTardy').textContent = '--';
-        return;
-      }
-
-      const totals = data.reduce((acc, a) => {
-        acc.present += a.present_days || 0;
-        acc.absent += a.absent_days || 0;
-        acc.tardy += a.tardy_days || 0;
-        return acc;
-      }, { present: 0, absent: 0, tardy: 0 });
-
-      document.getElementById('attendancePresent').textContent = totals.present;
-      document.getElementById('attendanceAbsent').textContent = totals.absent;
-      document.getElementById('attendanceTardy').textContent = totals.tardy;
-
+      return response.ok && Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Failed to load attendance:', error.message);
+      return [];
     }
   }
 
+  async function fetchRemarksValues(studentId) {
+    try {
+      const response = await fetch(`${API_BASE}/remarks-values/${studentId}?schoolYear=${SCHOOL_YEAR}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      return response.ok && Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('Failed to load remarks & values:', error.message);
+      return [];
+    }
+  }
+
+  function renderQuarterSelect() {
+    const select = document.getElementById('quarterSelect');
+    if (childQuarters.length === 0) {
+      select.innerHTML = '<option value="">No quarters released yet</option>';
+      select.disabled = true;
+      return;
+    }
+    select.disabled = false;
+    select.innerHTML = childQuarters.map(q => `<option value="${q.short}">${q.quarter}</option>`).join('');
+    select.value = activeQuarterShort;
+  }
+
+  function handleQuarterChange() {
+    const select = document.getElementById('quarterSelect');
+    activeQuarterShort = select.value || null;
+    const entry = childQuarters.find(q => q.short === activeQuarterShort);
+    activeQuarterLabel = entry ? entry.quarter : null;
+    renderActivePage();
+  }
+
+  function renderActivePage() {
+    if (!activeStudentId) return;
+    if (activePage === 'overview') renderOverview();
+    if (activePage === 'grades') renderGrades();
+    if (activePage === 'attendance') renderAttendance();
+    if (activePage === 'remarks') renderRemarksValues();
+    // reportcards is a static placeholder - nothing to render
+  }
+
+  function gradeRemarkBadge(score) {
+    if (score === null || score === undefined || score === '') return '<span class="pill pill-gray">Not entered</span>';
+    const num = Number(score);
+    if (isNaN(num)) return '<span class="pill pill-gray">Not entered</span>';
+    if (num >= 90) return '<span class="pill pill-green">Outstanding</span>';
+    if (num >= 75) return '<span class="pill pill-gray">Passed</span>';
+    return '<span class="pill pill-red">Needs support</span>';
+  }
+
+  function computeQuarterAverage() {
+    const num = quarterNumber(activeQuarterShort);
+    if (!num) return null;
+    const graded = childGrades
+      .map(g => g['q' + num])
+      .filter(v => v !== null && v !== undefined)
+      .map(v => parseFloat(v));
+    if (graded.length === 0) return null;
+    return Math.round((graded.reduce((sum, v) => sum + v, 0) / graded.length) * 100) / 100;
+  }
+
+  function honorBadgeHtml(average) {
+    if (average === null) return '<div class="empty-msg">No honor roll standing yet for this quarter.</div>';
+    if (average >= 98) return '<div class="honor-badge">🏅 With Highest Honors</div>';
+    if (average >= 95) return '<div class="honor-badge">🏅 With High Honors</div>';
+    if (average >= 90) return '<div class="honor-badge">🏅 With Honors</div>';
+    return '<div class="empty-msg">Not currently on the honor roll for this quarter.</div>';
+  }
+
+  function attendanceRecordForActiveQuarter() {
+    return childAttendance.find(a => a.month === activeQuarterShort) || null;
+  }
+
+  function attendanceRateInfo() {
+    const rec = attendanceRecordForActiveQuarter();
+    const present = rec ? Number(rec.present_days) || 0 : 0;
+    const schoolDays = rec ? Number(rec.school_days) || 0 : 0;
+    if (!rec || !schoolDays) return { rate: null, present, absent: rec ? Number(rec.absent_days) || 0 : 0, tardy: rec ? Number(rec.tardy_days) || 0 : 0 };
+    const rate = Math.round((present / schoolDays) * 1000) / 10;
+    return { rate, present, absent: Number(rec.absent_days) || 0, tardy: Number(rec.tardy_days) || 0 };
+  }
+
+  function rateBadge(rate) {
+    if (rate === null || rate === undefined) return '<span class="pill pill-gray">No data</span>';
+    if (rate >= 95) return `<span class="pill pill-green">${rate}%</span>`;
+    if (rate >= 90) return `<span class="pill pill-yellow">${rate}%</span>`;
+    return `<span class="pill pill-red">${rate}%</span>`;
+  }
+
+  // ---------- Overview ----------
+  function renderOverview() {
+    const avg = computeQuarterAverage();
+    const { rate, present, absent, tardy } = attendanceRateInfo();
+    const label = activeQuarterLabel || 'This quarter';
+
+    document.getElementById('overviewStatRow').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">${label} Average</div>
+        <div class="stat-value">${avg !== null ? avg : '—'}</div>
+        <div class="stat-caption">${avg !== null ? gradeRemarkBadge(avg).replace(/<[^>]+>/g, '') : 'No grades released yet'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Present</div>
+        <div class="stat-value">${present}</div>
+        <div class="stat-caption">Days present</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Absent</div>
+        <div class="stat-value">${absent}</div>
+        <div class="stat-caption">Days absent</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tardy</div>
+        <div class="stat-value">${tardy}</div>
+        <div class="stat-caption">Days tardy</div>
+      </div>
+    `;
+
+    document.getElementById('overviewSubjectsSubtitle').textContent = `${label} grades`;
+
+    const wrap = document.getElementById('overviewSubjectsWrap');
+    if (!activeQuarterShort || childGrades.length === 0) {
+      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No grades released yet.</td></tr></tbody></table>`;
+      return;
+    }
+
+    const num = quarterNumber(activeQuarterShort);
+    const rows = childGrades.map(g => ({ subject: g.subject, score: g['q' + num] }));
+
+    wrap.innerHTML = `
+      <table class="table">
+        <thead><tr><th>Subject</th><th>Grade</th><th>Remark</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td>${escapeHtml(r.subject)}</td>
+              <td class="mono">${r.score !== null && r.score !== undefined ? r.score : '—'}</td>
+              <td>${gradeRemarkBadge(r.score)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ---------- Grades ----------
+  function renderGrades() {
+    const label = activeQuarterLabel || 'Quarter';
+    document.getElementById('gradesCardTitle').textContent = `Grades — ${label}`;
+
+    const statWrap = document.getElementById('gradesStatRow');
+    const wrap = document.getElementById('gradesTableWrap');
+
+    if (!activeQuarterShort || childGrades.length === 0) {
+      statWrap.innerHTML = '';
+      document.getElementById('gradesCardSubtitle').textContent = 'No grades released yet';
+      wrap.innerHTML = `<table class="table"><tbody><tr class="empty-row"><td>No grades released yet.</td></tr></tbody></table>`;
+      return;
+    }
+
+    const num = quarterNumber(activeQuarterShort);
+    const rows = childGrades.map(g => ({ subject: g.subject, score: g['q' + num] }));
+    const graded = rows.filter(r => r.score !== null && r.score !== undefined);
+    const avg = computeQuarterAverage();
+
+    document.getElementById('gradesCardSubtitle').textContent = `${graded.length}/${rows.length} subjects graded for ${label}`;
+
+    statWrap.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">${label} Average</div>
+        <div class="stat-value">${avg !== null ? avg : '—'}</div>
+        <div class="stat-caption">Across ${graded.length} graded subject${graded.length === 1 ? '' : 's'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Subjects Graded</div>
+        <div class="stat-value">${graded.length}/${rows.length}</div>
+        <div class="stat-caption">For ${label}</div>
+      </div>
+    `;
+
+    wrap.innerHTML = `
+      <table class="table">
+        <thead><tr><th>Subject</th><th>Grade</th><th>Remark</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td>${escapeHtml(r.subject)}</td>
+              <td class="mono">${r.score !== null && r.score !== undefined ? r.score : '—'}</td>
+              <td>${gradeRemarkBadge(r.score)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ---------- Attendance & Honors ----------
+  function renderAttendance() {
+    const label = activeQuarterLabel || 'this quarter';
+
+    if (!activeQuarterShort) {
+      document.getElementById('attendanceStatRow').innerHTML = `<div class="empty-msg">No attendance released yet.</div>`;
+      document.getElementById('honorBadgeWrap').innerHTML = honorBadgeHtml(null);
+      document.getElementById('honorCardSubtitle').textContent = 'Based on this quarter\'s average';
+      return;
+    }
+
+    const { rate, present, absent, tardy } = attendanceRateInfo();
+
+    document.getElementById('attendanceStatRow').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Present</div>
+        <div class="stat-value">${present}</div>
+        <div class="stat-caption">Days present in ${label}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Absent</div>
+        <div class="stat-value">${absent}</div>
+        <div class="stat-caption">Days absent in ${label}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tardy</div>
+        <div class="stat-value">${tardy}</div>
+        <div class="stat-caption">Days tardy in ${label}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Attendance Rate</div>
+        <div class="stat-value">${rate !== null ? rate + '%' : '—'}</div>
+        <div class="stat-caption">${rateBadge(rate)}</div>
+      </div>
+    `;
+
+    document.getElementById('honorCardSubtitle').textContent = `Based on the ${label} average`;
+    document.getElementById('honorBadgeWrap').innerHTML = honorBadgeHtml(computeQuarterAverage());
+  }
+
+  // ---------- Remarks & Values ----------
+  const CORE_VALUES = [
+    { key: 'Maka-Diyos', label: 'Maka-Diyos', hint: 'Reflects spiritual values' },
+    { key: 'Makatao', label: 'Makatao', hint: 'Demonstrates concern for others' },
+    { key: 'Makakalikasan', label: 'Makakalikasan', hint: 'Cares for the environment' },
+    { key: 'Makabansa', label: 'Makabansa', hint: 'Demonstrates pride in being a Filipino' }
+  ];
+
+  function coreValueRatingPill(rating) {
+    const map = {
+      AO: ['pill-green', 'Always Observed'],
+      SO: ['pill-gray', 'Sometimes Observed'],
+      RO: ['pill-yellow', 'Rarely Observed'],
+      NO: ['pill-red', 'Not Observed']
+    };
+    const [cls, label] = map[rating] || ['pill-gray', 'Not rated'];
+    return `<span class="pill ${cls}">${label}</span>`;
+  }
+
+  function renderRemarksValues() {
+    const label = activeQuarterLabel || 'this quarter';
+    document.getElementById('remarksCardTitle').textContent = `Remarks & Values — ${label}`;
+    const body = document.getElementById('remarksBody');
+
+    if (!activeQuarterShort) {
+      document.getElementById('remarksCardSubtitle').textContent = '';
+      body.innerHTML = `<div class="empty-msg">No remarks or ratings released yet.</div>`;
+      return;
+    }
+
+    const entry = childQuarters.find(q => q.short === activeQuarterShort);
+    document.getElementById('remarksCardSubtitle').textContent = `Adviser comments and core values for ${label}`;
+
+    const remarksText = entry && entry.remarks ? escapeHtml(entry.remarks) : null;
+    const values = entry ? entry.values : {};
+
+    body.innerHTML = `
+      <div class="field-label">Adviser's Remarks</div>
+      <p class="remarks-text">${remarksText || '<span class="empty-msg" style="padding:0;">No remarks recorded for this quarter.</span>'}</p>
+
+      <div class="field-label">Core Values</div>
+      <div class="values-display-grid">
+        ${CORE_VALUES.map(v => `
+          <div class="value-display-item">
+            <div>
+              <div class="value-name">${v.label}</div>
+              <div class="value-hint">${v.hint}</div>
+            </div>
+            ${coreValueRatingPill(values[v.key])}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // ---------- Announcements ----------
   async function loadAnnouncements() {
     try {
       const response = await fetch(`${API_BASE}/announcements/${currentSchoolId}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const data = await response.json();
-
-      const list = document.getElementById('announcementsList');
-      const empty = document.getElementById('announcementsEmpty');
-
-      if (!response.ok || data.length === 0) {
-        list.innerHTML = '';
-        empty.classList.remove('hidden');
-        return;
-      }
-
-      empty.classList.add('hidden');
-      list.innerHTML = data.slice(0, 5).map(a => `
-        <div class="announcement">
-          <h4>${a.title}</h4>
-          <div class="date">${new Date(a.date).toLocaleDateString()}</div>
-          <p>${a.message}</p>
-        </div>
-      `).join('');
-
+      cachedAnnouncements = response.ok && Array.isArray(data) ? data : [];
+      renderAnnouncements();
     } catch (error) {
       console.error('Failed to load announcements:', error.message);
     }
+  }
+
+  function renderAnnouncements() {
+    const list = document.getElementById('announcementsList');
+    if (!list) return;
+
+    if (cachedAnnouncements.length === 0) {
+      list.innerHTML = `<div class="empty-msg">No announcements yet.</div>`;
+      return;
+    }
+
+    list.innerHTML = cachedAnnouncements.slice(0, 5).map(a => `
+      <div class="announcement">
+        <h4>${escapeHtml(a.title)}</h4>
+        <div class="date">${new Date(a.date).toLocaleDateString()}</div>
+        <p>${escapeHtml(a.message)}</p>
+      </div>
+    `).join('');
   }
 
   // Logout
@@ -891,6 +923,11 @@
     children = [];
     currentSchoolId = null;
     activeStudentId = null;
+    childGrades = [];
+    childAttendance = [];
+    childQuarters = [];
+    activeQuarterShort = null;
+    activeQuarterLabel = null;
     localStorage.removeItem('parentToken');
     localStorage.removeItem('parentChildren');
     localStorage.removeItem('parentSchoolId');
