@@ -843,6 +843,55 @@ app.get('/api/subjects', verifyToken, async (req, res) => {
   }
 });
 
+// GET QUARTERS - any authenticated role. Unlike /api/admin/quarters, this
+// returns no grade/attendance/remarks data - just quarter metadata
+// (label/short/status), which isn't sensitive. Parents need this to render
+// report card quarter tabs: which quarters are released (selectable), which
+// one is in progress (shown but disabled), and which haven't started
+// (hidden). Actual per-quarter grades/attendance/remarks are still fetched
+// through the existing endpoints, which remain strictly released-only for
+// the parent role.
+app.get('/api/quarters', verifyToken, async (req, res) => {
+  try {
+    const quarters = await client.query(
+      `SELECT id, school_year, label, short, sort_order, status
+       FROM quarters
+       WHERE school_id = $1
+       ORDER BY school_year DESC, sort_order ASC`,
+      [req.user.schoolId]
+    );
+
+    res.json(quarters.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET SCHOOL INFO - any authenticated role. Name/address/director aren't
+// sensitive per-student data (just the school's own public info), and the
+// parent-facing report card needs them for its header band and signature
+// block. /api/admin/school stays admin-only since it backs the editable
+// School Settings form; this is a read-only, cross-role mirror of the same
+// non-sensitive columns.
+app.get('/api/school-info', verifyToken, async (req, res) => {
+  try {
+    const result = await client.query(
+      'SELECT name, address, director, registrar FROM schools WHERE id = $1',
+      [req.user.schoolId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'School not found' });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== GRADE ENTRY (Admin only) ====================
 
 // 7f. LIST SUBJECTS for a grade level
